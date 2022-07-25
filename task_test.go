@@ -19,7 +19,7 @@ var _ = Describe("Task", func() {
 	}
 
 	It("should work with defaults", func() {
-		task := controller.Task(h)
+		task := controller.Task[string](h)
 		ts := httptest.NewServer(task)
 
 		defer ts.Close()
@@ -41,9 +41,9 @@ var _ = Describe("Task", func() {
 	})
 
 	It("should use WithHTTPStatusCode option", func() {
-		task := controller.Task(
-			h, controller.WithHTTPStatus(http.StatusCreated),
-		)
+		task := controller.
+			Task[string](h).
+			With(controller.OptionHTTPStatus(http.StatusCreated))
 		ts := httptest.NewServer(task)
 
 		defer ts.Close()
@@ -73,15 +73,17 @@ var _ = Describe("Task", func() {
 
 			return "success", nil
 		}
-		task := controller.Task(
-			h, controller.WithURLParamReader(func(_ *http.Request, key string) string {
-				if key == "test" {
-					return "test"
-				}
+		task := controller.
+			Task[string](h).
+			With(
+				controller.OptionURLParamReader(func(_ *http.Request, key string) string {
+					if key == "test" {
+						return "test"
+					}
 
-				return ""
-			}),
-		)
+					return ""
+				}),
+			)
 		ts := httptest.NewServer(task)
 
 		defer ts.Close()
@@ -111,7 +113,7 @@ var _ = Describe("Task", func() {
 
 			return "success", nil
 		}
-		task := controller.Task(h)
+		task := controller.Task[string](h)
 		ts := httptest.NewServer(task)
 
 		defer ts.Close()
@@ -141,7 +143,9 @@ var _ = Describe("Task", func() {
 		h := func(context.Context, func(controller.ParamSource, string) string) (string, error) {
 			return "", &testError{Detail: "oops"}
 		}
-		task := controller.Task(h, controller.WithAppError[*testError](http.StatusBadRequest))
+		task := controller.
+			Task[string](h).
+			With(controller.OptionAppError[*testError](http.StatusBadRequest))
 		ts := httptest.NewServer(task)
 
 		defer ts.Close()
@@ -169,15 +173,16 @@ var _ = Describe("Task", func() {
 		) (string, error) {
 			return "", &testError{Detail: "oops"}
 		}
-		task := controller.Task(
-			h,
-			controller.WithAppError[*testError](http.StatusBadRequest),
-			controller.WithErrorLogger(func(_ context.Context, err error, message string) {
-				Expect(err).Should(BeAssignableToTypeOf(new(testError)))
-				Expect(err.(*testError).Detail).To(Equal("oops"))
-				Expect(message).To(Equal("request failed"))
-			}),
-		)
+		task := controller.
+			Task[string](h).
+			With(
+				controller.OptionAppError[*testError](http.StatusBadRequest),
+				controller.OptionErrorLogger(func(_ context.Context, err error, message string) {
+					Expect(err).Should(BeAssignableToTypeOf(new(testError)))
+					Expect(err.(*testError).Detail).To(Equal("oops"))
+					Expect(message).To(Equal("request failed"))
+				}),
+			)
 		ts := httptest.NewServer(task)
 
 		defer ts.Close()
@@ -201,13 +206,14 @@ var _ = Describe("Task", func() {
 
 	It("should use WithRequestContentReader option", func() {
 		called := false
-		task := controller.Task(
-			h,
-			controller.WithRequestContentReader(func(req *http.Request, model any) error {
-				called = true
-				return controller.JSONBodyReader(req, model)
-			}),
-		)
+		task := controller.
+			Task[string](h).
+			With(
+				controller.OptionRequestContentReader(func(req *http.Request, model any) error {
+					called = true
+					return controller.JSONBodyReader(req, model)
+				}),
+			)
 		ts := httptest.NewServer(task)
 
 		defer ts.Close()
@@ -232,17 +238,18 @@ var _ = Describe("Task", func() {
 
 	It("should use WithResponseWriter option", func() {
 		called := false
-		task := controller.Task(
-			h,
-			controller.WithResponseWriter(func(
-				ctx context.Context, w http.ResponseWriter,
-				logError func(context.Context, error, string),
-				status int, data any,
-			) {
-				called = true
-				controller.JSONWriter(ctx, w, logError, status, data)
-			}),
-		)
+		task := controller.
+			Task[string](h).
+			With(
+				controller.OptionResponseWriter(func(
+					ctx context.Context, w http.ResponseWriter,
+					logError func(context.Context, error, string),
+					status int, data any,
+				) {
+					called = true
+					controller.JSONWriter(ctx, w, logError, status, data)
+				}),
+			)
 		ts := httptest.NewServer(task)
 
 		defer ts.Close()

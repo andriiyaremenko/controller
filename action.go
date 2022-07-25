@@ -5,11 +5,10 @@ import (
 	"net/http"
 )
 
-func Action[T, U any](
-	handle func(context.Context, T, func(ParamSource, string) string) (U, error),
-	options ...func(*Options),
-) http.HandlerFunc {
-	opts := Options{
+type Action[T, U any] func(context.Context, T, func(ParamSource, string) string) (U, error)
+
+func (handle Action[T, U]) With(opts ...func(*Options)) http.Handler {
+	options := Options{
 		LogError:           func(context.Context, error, string) {},
 		ErrorHandlers:      []ErrorHandler{},
 		RequestURLParam:    func(*http.Request, string) string { return "" },
@@ -17,15 +16,34 @@ func Action[T, U any](
 		SuccessCode:        http.StatusOK,
 		ReadRequestContent: JSONBodyReader,
 	}
-	for _, option := range options {
-		option(&opts)
+	for _, option := range opts {
+		option(&options)
 	}
 
-	return func(w http.ResponseWriter, req *http.Request) {
-		ctx := req.Context()
+	return handle.getHttpHandle(&options)
+}
+
+func (handle Action[T, U]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	handle.
+		getHttpHandle(
+			&Options{
+				LogError:           func(context.Context, error, string) {},
+				ErrorHandlers:      []ErrorHandler{},
+				RequestURLParam:    func(*http.Request, string) string { return "" },
+				WriteResponse:      JSONWriter,
+				SuccessCode:        http.StatusOK,
+				ReadRequestContent: JSONBodyReader,
+			},
+		).
+		ServeHTTP(w, r)
+}
+
+func (handle Action[T, U]) getHttpHandle(opts *Options) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 
 		var model T
-		if err := opts.ReadRequestContent(req, &model); err != nil {
+		if err := opts.ReadRequestContent(r, &model); err != nil {
 			code, response := getErrorResponse(err, opts.ErrorHandlers)
 
 			opts.LogError(ctx, err, "failed to read request content")
@@ -34,7 +52,7 @@ func Action[T, U any](
 			return
 		}
 
-		result, err := handle(ctx, model, readParam(req, opts.RequestURLParam))
+		result, err := handle(ctx, model, readParam(r, opts.RequestURLParam))
 		if err != nil {
 			code, response := getErrorResponse(err, opts.ErrorHandlers)
 

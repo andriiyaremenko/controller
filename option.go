@@ -20,25 +20,25 @@ type Options struct {
 	SuccessCode   int
 }
 
-func WithHTTPStatus(code int) func(*Options) {
+func OptionHTTPStatus(code int) func(*Options) {
 	return func(opts *Options) {
 		opts.SuccessCode = code
 	}
 }
 
-func WithURLParamReader(r func(*http.Request, string) string) func(*Options) {
+func OptionURLParamReader(r func(*http.Request, string) string) func(*Options) {
 	return func(opts *Options) {
 		opts.RequestURLParam = r
 	}
 }
 
-func WithErrorLogger(log func(context.Context, error, string)) func(*Options) {
+func OptionErrorLogger(log func(context.Context, error, string)) func(*Options) {
 	return func(opts *Options) {
 		opts.LogError = log
 	}
 }
 
-func WithAppError[E any](httpCode int) func(*Options) {
+func OptionAppError[E any](httpCode int) func(*Options) {
 	return func(opts *Options) {
 		opts.ErrorHandlers = append(
 			opts.ErrorHandlers,
@@ -54,13 +54,13 @@ func WithAppError[E any](httpCode int) func(*Options) {
 	}
 }
 
-func WithResponseWriter(w ResponseWriter) func(*Options) {
+func OptionResponseWriter(w ResponseWriter) func(*Options) {
 	return func(opts *Options) {
 		opts.WriteResponse = w
 	}
 }
 
-func WithRequestContentReader(r RequestReader) func(*Options) {
+func OptionRequestContentReader(r RequestReader) func(*Options) {
 	return func(opts *Options) {
 		opts.ReadRequestContent = r
 	}

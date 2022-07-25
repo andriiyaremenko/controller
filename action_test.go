@@ -33,7 +33,7 @@ var _ = Describe("Action", func() {
 	}
 
 	It("should work with defaults", func() {
-		action := controller.Action(h)
+		action := controller.Action[string, string](h)
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -60,9 +60,9 @@ var _ = Describe("Action", func() {
 	})
 
 	It("should use WithHTTPStatusCode option", func() {
-		action := controller.Action(
-			h, controller.WithHTTPStatus(http.StatusCreated),
-		)
+		action := controller.
+			Action[string, string](h).
+			With(controller.OptionHTTPStatus(http.StatusCreated))
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -97,15 +97,17 @@ var _ = Describe("Action", func() {
 
 			return "success", nil
 		}
-		action := controller.Action(
-			h, controller.WithURLParamReader(func(_ *http.Request, key string) string {
-				if key == "test" {
-					return "test"
-				}
+		action := controller.
+			Action[string, string](h).
+			With(
+				controller.OptionURLParamReader(func(_ *http.Request, key string) string {
+					if key == "test" {
+						return "test"
+					}
 
-				return ""
-			}),
-		)
+					return ""
+				}),
+			)
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -140,7 +142,7 @@ var _ = Describe("Action", func() {
 
 			return "success", nil
 		}
-		action := controller.Action(h)
+		action := controller.Action[string, string](h)
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -175,7 +177,9 @@ var _ = Describe("Action", func() {
 
 			return "", &testError{Detail: "oops"}
 		}
-		action := controller.Action(h, controller.WithAppError[*testError](http.StatusBadRequest))
+		action := controller.
+			Action[string, string](h).
+			With(controller.OptionAppError[*testError](http.StatusBadRequest))
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -209,15 +213,16 @@ var _ = Describe("Action", func() {
 
 			return "", &testError{Detail: "oops"}
 		}
-		action := controller.Action(
-			h,
-			controller.WithAppError[*testError](http.StatusBadRequest),
-			controller.WithErrorLogger(func(_ context.Context, err error, message string) {
-				Expect(err).Should(BeAssignableToTypeOf(new(testError)))
-				Expect(err.(*testError).Detail).To(Equal("oops"))
-				Expect(message).To(Equal("request failed"))
-			}),
-		)
+		action := controller.
+			Action[string, string](h).
+			With(
+				controller.OptionAppError[*testError](http.StatusBadRequest),
+				controller.OptionErrorLogger(func(_ context.Context, err error, message string) {
+					Expect(err).Should(BeAssignableToTypeOf(new(testError)))
+					Expect(err.(*testError).Detail).To(Equal("oops"))
+					Expect(message).To(Equal("request failed"))
+				}),
+			)
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -245,13 +250,13 @@ var _ = Describe("Action", func() {
 
 	It("should use WithRequestContentReader option", func() {
 		called := false
-		action := controller.Action(
-			h,
-			controller.WithRequestContentReader(func(req *http.Request, model any) error {
-				called = true
-				return controller.JSONBodyReader(req, model)
-			}),
-		)
+		action := controller.Action[string, string](h).
+			With(
+				controller.OptionRequestContentReader(func(req *http.Request, model any) error {
+					called = true
+					return controller.JSONBodyReader(req, model)
+				}),
+			)
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -280,17 +285,18 @@ var _ = Describe("Action", func() {
 
 	It("should use WithResponseWriter option", func() {
 		called := false
-		action := controller.Action(
-			h,
-			controller.WithResponseWriter(func(
-				ctx context.Context, w http.ResponseWriter,
-				logError func(context.Context, error, string),
-				status int, data any,
-			) {
-				called = true
-				controller.JSONWriter(ctx, w, logError, status, data)
-			}),
-		)
+		action := controller.
+			Action[string, string](h).
+			With(
+				controller.OptionResponseWriter(func(
+					ctx context.Context, w http.ResponseWriter,
+					logError func(context.Context, error, string),
+					status int, data any,
+				) {
+					called = true
+					controller.JSONWriter(ctx, w, logError, status, data)
+				}),
+			)
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
