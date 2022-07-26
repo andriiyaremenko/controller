@@ -181,7 +181,7 @@ var _ = Describe("Task", func() {
 			With(
 				controller.TaskAppError(
 					controller.HandleErrorAs(
-						fmt.Errorf("oh"), http.StatusConflict,
+						fmt.Errorf("oooh"), http.StatusConflict,
 						func(err error, _ controller.ReadParam) any {
 							return &testError{Detail: err.Error()}
 						},

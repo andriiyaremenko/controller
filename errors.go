@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 )
 
@@ -10,7 +11,7 @@ type ErrorHandler func(error, ReadParam) (int, any)
 func getErrorResponse(err error, paramReader ReadParam, handlers []ErrorHandler) (int, any) {
 	for _, handle := range handlers {
 		code, response := handle(err, paramReader)
-		if response != nil {
+		if code != 0 {
 			return code, response
 		}
 	}
@@ -36,4 +37,16 @@ func HandleErrorAs[E any](target E, httpCode int, as func(E, ReadParam) any) Err
 
 		return 0, nil
 	}
+}
+
+type ReadRequestError struct {
+	err error
+}
+
+func (err *ReadRequestError) Error() string {
+	return fmt.Sprintf("failed to read request: %s", err.err)
+}
+
+func (err *ReadRequestError) Unwrap() error {
+	return err.err
 }

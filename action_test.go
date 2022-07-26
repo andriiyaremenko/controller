@@ -179,7 +179,11 @@ var _ = Describe("Action", func() {
 		}
 		action := controller.
 			Action[string, string](h).
-			With(controller.ActionAppError(controller.HandleError(new(testError), http.StatusBadRequest)))
+			With(
+				controller.ActionAppError(
+					controller.HandleError(new(testError), http.StatusBadRequest),
+				),
+			)
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -217,8 +221,11 @@ var _ = Describe("Action", func() {
 			Action[string, string](h).
 			With(
 				controller.ActionAppError(
+					controller.HandleError(new(testError), http.StatusBadRequest),
+				),
+				controller.ActionAppError(
 					controller.HandleErrorAs(
-						fmt.Errorf("oh"), http.StatusConflict,
+						fmt.Errorf("oooh"), http.StatusConflict,
 						func(err error, _ controller.ReadParam) any {
 							return &testError{Detail: err.Error()}
 						},
