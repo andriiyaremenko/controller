@@ -28,3 +28,11 @@ func JSONWriter(
 		logError(ctx, err, "failed to write JSON")
 	}
 }
+
+func NoContentWriter(
+	_ context.Context, w http.ResponseWriter,
+	_ func(context.Context, error, string),
+	_ int, _ any,
+) {
+	w.WriteHeader(http.StatusNoContent)
+}

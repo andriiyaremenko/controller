@@ -7,8 +7,8 @@ import (
 
 type Action[T, U any] func(context.Context, T, func(ParamSource, string) string) (U, error)
 
-func (handle Action[T, U]) With(opts ...func(*Options)) http.Handler {
-	options := Options{
+func (handle Action[T, U]) With(opts ...func(*ActionOptions)) http.Handler {
+	options := ActionOptions{
 		LogError:           func(context.Context, error, string) {},
 		ErrorHandlers:      []ErrorHandler{},
 		RequestURLParam:    func(*http.Request, string) string { return "" },
@@ -26,7 +26,7 @@ func (handle Action[T, U]) With(opts ...func(*Options)) http.Handler {
 func (handle Action[T, U]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	handle.
 		getHttpHandle(
-			&Options{
+			&ActionOptions{
 				LogError:           func(context.Context, error, string) {},
 				ErrorHandlers:      []ErrorHandler{},
 				RequestURLParam:    func(*http.Request, string) string { return "" },
@@ -38,13 +38,14 @@ func (handle Action[T, U]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ServeHTTP(w, r)
 }
 
-func (handle Action[T, U]) getHttpHandle(opts *Options) http.HandlerFunc {
+func (handle Action[T, U]) getHttpHandle(opts *ActionOptions) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		readParam := readParam(r, opts.RequestURLParam)
 
 		var model T
 		if err := opts.ReadRequestContent(r, &model); err != nil {
-			code, response := getErrorResponse(err, opts.ErrorHandlers)
+			code, response := getErrorResponse(err, readParam, opts.ErrorHandlers)
 
 			opts.LogError(ctx, err, "failed to read request content")
 			opts.WriteResponse(ctx, w, opts.LogError, code, response)
@@ -52,9 +53,9 @@ func (handle Action[T, U]) getHttpHandle(opts *Options) http.HandlerFunc {
 			return
 		}
 
-		result, err := handle(ctx, model, readParam(r, opts.RequestURLParam))
+		result, err := handle(ctx, model, readParam)
 		if err != nil {
-			code, response := getErrorResponse(err, opts.ErrorHandlers)
+			code, response := getErrorResponse(err, readParam, opts.ErrorHandlers)
 
 			opts.LogError(ctx, err, "request failed")
 			opts.WriteResponse(ctx, w, opts.LogError, code, response)
