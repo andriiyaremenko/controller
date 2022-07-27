@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 )
 
 type RequestReader func(*http.Request, any) error
@@ -19,4 +20,18 @@ func JSONBodyReader(req *http.Request, model any) error {
 	}
 
 	return nil
+}
+
+func FormReader(decode func(any, url.Values) error) RequestReader {
+	return func(req *http.Request, model any) error {
+		if err := req.ParseForm(); err != nil {
+			return &ReadRequestError{err: err}
+		}
+
+		if err := decode(model, req.PostForm); err != nil {
+			return &ReadRequestError{err: err}
+		}
+
+		return nil
+	}
 }
