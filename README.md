@@ -11,6 +11,7 @@ It provides simple and explicit API to define HTTP endpoints.
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
