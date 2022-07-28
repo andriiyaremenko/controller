@@ -146,7 +146,7 @@ var _ = Describe("Task", func() {
 		task := controller.
 			Task[string](h).
 			With(controller.TaskAppError(
-				controller.HandleError(new(testError), http.StatusBadRequest)),
+				controller.HandleError[*testError](http.StatusBadRequest)),
 			)
 		ts := httptest.NewServer(task)
 
@@ -181,7 +181,7 @@ var _ = Describe("Task", func() {
 			With(
 				controller.TaskAppError(
 					controller.HandleErrorAs(
-						fmt.Errorf("oooh"), http.StatusConflict,
+						http.StatusConflict,
 						func(err error, _ controller.ReadParam) any {
 							return &testError{Detail: err.Error()}
 						},
@@ -219,7 +219,7 @@ var _ = Describe("Task", func() {
 			Task[string](h).
 			With(
 				controller.TaskAppError(
-					controller.HandleError(new(testError), http.StatusBadRequest),
+					controller.HandleError[*testError](http.StatusBadRequest),
 				),
 				controller.TaskErrorLogger(func(_ context.Context, err error, message string) {
 					Expect(err).Should(BeAssignableToTypeOf(new(testError)))

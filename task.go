@@ -5,8 +5,10 @@ import (
 	"net/http"
 )
 
+// Task is http.Handle that utilizes generics to reduce amount of boilerplate code.
 type Task[T any] func(context.Context, func(ParamSource, string) string) (T, error)
 
+// With allows change default Action behaviour with options.
 func (handle Task[T]) With(opts ...func(*TaskOptions)) http.Handler {
 	options := TaskOptions{
 		LogError:        func(context.Context, error, string) {},

@@ -7,12 +7,14 @@ import (
 	"net/url"
 )
 
+// Response writer type.
 type ResponseWriter func(
 	context.Context, http.ResponseWriter,
 	func(context.Context, error, string),
 	int, any,
 )
 
+// Response writer to write HTTP status 204 NoContent without payload.
 func NoContentWriter(
 	_ context.Context, w http.ResponseWriter,
 	_ func(context.Context, error, string),
@@ -21,6 +23,8 @@ func NoContentWriter(
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// Response writer to write JSON response
+// in body with Content-Type "application/json; charset=utf-8" Header.
 func JSONWriter(
 	ctx context.Context, w http.ResponseWriter,
 	logError func(context.Context, error, string),
@@ -38,6 +42,8 @@ func JSONWriter(
 	}
 }
 
+// Response writer to write Form Data response
+// in body with Content-Type "application/x-www-form-urlencoded" Header.
 func FormWriter(encode func(any, url.Values) error) ResponseWriter {
 	return func(
 		ctx context.Context, w http.ResponseWriter,

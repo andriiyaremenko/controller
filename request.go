@@ -7,8 +7,10 @@ import (
 	"net/url"
 )
 
+// Request reader type.
 type RequestReader func(*http.Request, any) error
 
+// Request reader to read JSON from Body.
 func JSONBodyReader(req *http.Request, model any) error {
 	b, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -22,6 +24,7 @@ func JSONBodyReader(req *http.Request, model any) error {
 	return nil
 }
 
+// Request reader to read from Form Data using decode callback.
 func FormReader(decode func(any, url.Values) error) RequestReader {
 	return func(req *http.Request, model any) error {
 		if err := req.ParseForm(); err != nil {

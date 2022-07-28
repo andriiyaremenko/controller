@@ -5,8 +5,11 @@ import (
 	"net/http"
 )
 
+// Action is http.Handle that utilizes generics to process request payload
+// and reduce amount of boilerplate code.
 type Action[T, U any] func(context.Context, T, func(ParamSource, string) string) (U, error)
 
+// With allows change default Action behaviour with options.
 func (handle Action[T, U]) With(opts ...func(*ActionOptions)) http.Handler {
 	options := ActionOptions{
 		LogError:           func(context.Context, error, string) {},

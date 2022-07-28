@@ -6,21 +6,14 @@ import (
 	"net/http"
 )
 
+// ErrorHandler transforms error to HTTP status code and response body.
 type ErrorHandler func(error, ReadParam) (int, any)
 
-func getErrorResponse(err error, paramReader ReadParam, handlers []ErrorHandler) (int, any) {
-	for _, handle := range handlers {
-		code, response := handle(err, paramReader)
-		if code != 0 {
-			return code, response
-		}
-	}
-
-	return http.StatusInternalServerError, err.Error()
-}
-
-func HandleError[E any](target E, httpCode int) ErrorHandler {
+// HandleError checks if error is of E type
+// and returns designated HTTP Status Code with E instance as a response if true.
+func HandleError[E any](httpCode int) ErrorHandler {
 	return func(err error, readParam ReadParam) (int, any) {
+		var target E
 		if errors.As(err, &target) {
 			return httpCode, target
 		}
@@ -29,8 +22,11 @@ func HandleError[E any](target E, httpCode int) ErrorHandler {
 	}
 }
 
-func HandleErrorAs[E any](target E, httpCode int, as func(E, ReadParam) any) ErrorHandler {
+// HandleErrorAs checks if error is of E type
+// and returns designated HTTP Status Code with transformed response using as callback if true.
+func HandleErrorAs[E any](httpCode int, as func(E, ReadParam) any) ErrorHandler {
 	return func(err error, readParam ReadParam) (int, any) {
+		var target E
 		if errors.As(err, &target) {
 			return httpCode, as(target, readParam)
 		}
@@ -39,6 +35,7 @@ func HandleErrorAs[E any](target E, httpCode int, as func(E, ReadParam) any) Err
 	}
 }
 
+// If request payload reading failed - ReadRequestError is returned.
 type ReadRequestError struct {
 	err error
 }
@@ -49,4 +46,15 @@ func (err *ReadRequestError) Error() string {
 
 func (err *ReadRequestError) Unwrap() error {
 	return err.err
+}
+
+func getErrorResponse(err error, paramReader ReadParam, handlers []ErrorHandler) (int, any) {
+	for _, handle := range handlers {
+		code, response := handle(err, paramReader)
+		if code != 0 {
+			return code, response
+		}
+	}
+
+	return http.StatusInternalServerError, err.Error()
 }

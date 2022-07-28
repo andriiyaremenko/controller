@@ -181,7 +181,7 @@ var _ = Describe("Action", func() {
 			Action[string, string](h).
 			With(
 				controller.ActionAppError(
-					controller.HandleError(new(testError), http.StatusBadRequest),
+					controller.HandleError[*testError](http.StatusBadRequest),
 				),
 			)
 		ts := httptest.NewServer(action)
@@ -221,11 +221,11 @@ var _ = Describe("Action", func() {
 			Action[string, string](h).
 			With(
 				controller.ActionAppError(
-					controller.HandleError(new(testError), http.StatusBadRequest),
+					controller.HandleError[*testError](http.StatusBadRequest),
 				),
 				controller.ActionAppError(
 					controller.HandleErrorAs(
-						fmt.Errorf("oooh"), http.StatusConflict,
+						http.StatusConflict,
 						func(err error, _ controller.ReadParam) any {
 							return &testError{Detail: err.Error()}
 						},
@@ -269,7 +269,7 @@ var _ = Describe("Action", func() {
 			Action[string, string](h).
 			With(
 				controller.ActionAppError(
-					controller.HandleError(new(testError), http.StatusBadRequest),
+					controller.HandleError[*testError](http.StatusBadRequest),
 				),
 				controller.ActionErrorLogger(func(_ context.Context, err error, message string) {
 					Expect(err).Should(BeAssignableToTypeOf(new(testError)))
