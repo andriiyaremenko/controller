@@ -182,7 +182,7 @@ var _ = Describe("Task", func() {
 			With(
 				controller.ErrorHandlers[*controller.TaskOptions](
 					controller.IfError[*testError](http.StatusBadRequest),
-					controller.IfErrorAs(
+					controller.IfErrorUse(
 						func(err error, _ controller.ReadParam) any {
 							return &testError{Detail: err.Error()}
 						},
