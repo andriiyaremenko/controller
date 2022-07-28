@@ -62,7 +62,7 @@ var _ = Describe("Action", func() {
 	It("should use WithHTTPStatusCode option", func() {
 		action := controller.
 			Action[string, string](h).
-			With(controller.ActionHTTPStatus(http.StatusCreated))
+			With(controller.HTTPStatus[*controller.ActionOptions](http.StatusCreated))
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -100,13 +100,15 @@ var _ = Describe("Action", func() {
 		action := controller.
 			Action[string, string](h).
 			With(
-				controller.ActionURLParamReader(func(_ *http.Request, key string) string {
-					if key == "test" {
-						return "test"
-					}
+				controller.URLParamReader[*controller.ActionOptions](
+					func(_ *http.Request, key string) string {
+						if key == "test" {
+							return "test"
+						}
 
-					return ""
-				}),
+						return ""
+					},
+				),
 			)
 		ts := httptest.NewServer(action)
 
@@ -180,8 +182,8 @@ var _ = Describe("Action", func() {
 		action := controller.
 			Action[string, string](h).
 			With(
-				controller.ActionAppError(
-					controller.HandleError[*testError](http.StatusBadRequest),
+				controller.ErrorHandlers[*controller.ActionOptions](
+					controller.IfError[*testError](http.StatusBadRequest),
 				),
 			)
 		ts := httptest.NewServer(action)
@@ -220,15 +222,13 @@ var _ = Describe("Action", func() {
 		action := controller.
 			Action[string, string](h).
 			With(
-				controller.ActionAppError(
-					controller.HandleError[*testError](http.StatusBadRequest),
-				),
-				controller.ActionAppError(
-					controller.HandleErrorAs(
-						http.StatusConflict,
+				controller.ErrorHandlers[*controller.ActionOptions](
+					controller.IfError[*testError](http.StatusBadRequest),
+					controller.IfErrorAs(
 						func(err error, _ controller.ReadParam) any {
 							return &testError{Detail: err.Error()}
 						},
+						http.StatusConflict,
 					),
 				),
 			)
@@ -268,14 +268,15 @@ var _ = Describe("Action", func() {
 		action := controller.
 			Action[string, string](h).
 			With(
-				controller.ActionAppError(
-					controller.HandleError[*testError](http.StatusBadRequest),
+				controller.ErrorHandlers[*controller.ActionOptions](
+					controller.IfError[*testError](http.StatusBadRequest),
 				),
-				controller.ActionErrorLogger(func(_ context.Context, err error, message string) {
-					Expect(err).Should(BeAssignableToTypeOf(new(testError)))
-					Expect(err.(*testError).Detail).To(Equal("oops"))
-					Expect(message).To(Equal("request failed"))
-				}),
+				controller.ErrorLogger[*controller.ActionOptions](
+					func(_ context.Context, err error, message string) {
+						Expect(err).Should(BeAssignableToTypeOf(new(testError)))
+						Expect(err.(*testError).Detail).To(Equal("oops"))
+						Expect(message).To(Equal("request failed"))
+					}),
 			)
 		ts := httptest.NewServer(action)
 
@@ -306,7 +307,7 @@ var _ = Describe("Action", func() {
 		called := false
 		action := controller.Action[string, string](h).
 			With(
-				controller.ActionRequestContentReader(func(req *http.Request, model any) error {
+				controller.RequestContentReader(func(req *http.Request, model any) error {
 					called = true
 					return controller.JSONBodyReader(req, model)
 				}),
@@ -342,7 +343,7 @@ var _ = Describe("Action", func() {
 		action := controller.
 			Action[string, string](h).
 			With(
-				controller.ActionResponseWriter(func(
+				controller.ResponseWriter[*controller.ActionOptions](func(
 					ctx context.Context, w http.ResponseWriter,
 					logError func(context.Context, error, string),
 					status int, data any,

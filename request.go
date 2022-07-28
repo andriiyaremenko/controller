@@ -8,7 +8,7 @@ import (
 )
 
 // Request reader type.
-type RequestReader func(*http.Request, any) error
+type ReadRequest func(*http.Request, any) error
 
 // Request reader to read JSON from Body.
 func JSONBodyReader(req *http.Request, model any) error {
@@ -25,7 +25,7 @@ func JSONBodyReader(req *http.Request, model any) error {
 }
 
 // Request reader to read from Form Data using decode callback.
-func FormReader(decode func(any, url.Values) error) RequestReader {
+func FormReader(decode func(any, url.Values) error) ReadRequest {
 	return func(req *http.Request, model any) error {
 		if err := req.ParseForm(); err != nil {
 			return &ReadRequestError{err: err}

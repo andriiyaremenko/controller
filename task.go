@@ -11,11 +11,13 @@ type Task[T any] func(context.Context, func(ParamSource, string) string) (T, err
 // With allows change default Action behaviour with options.
 func (handle Task[T]) With(opts ...func(*TaskOptions)) http.Handler {
 	options := TaskOptions{
-		LogError:        func(context.Context, error, string) {},
-		ErrorHandlers:   []ErrorHandler{},
-		RequestURLParam: func(*http.Request, string) string { return "" },
-		WriteResponse:   JSONWriter,
-		SuccessCode:     http.StatusOK,
+		Options: Options{
+			LogError:        func(context.Context, error, string) {},
+			ErrorHandlers:   []ErrorHandler{},
+			RequestURLParam: func(*http.Request, string) string { return "" },
+			WriteResponse:   JSONWriter,
+			SuccessCode:     http.StatusOK,
+		},
 	}
 	for _, option := range opts {
 		option(&options)
@@ -28,11 +30,13 @@ func (handle Task[T]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	handle.
 		getHttpHandle(
 			&TaskOptions{
-				LogError:        func(context.Context, error, string) {},
-				ErrorHandlers:   []ErrorHandler{},
-				RequestURLParam: func(*http.Request, string) string { return "" },
-				WriteResponse:   JSONWriter,
-				SuccessCode:     http.StatusOK,
+				Options: Options{
+					LogError:        func(context.Context, error, string) {},
+					ErrorHandlers:   []ErrorHandler{},
+					RequestURLParam: func(*http.Request, string) string { return "" },
+					WriteResponse:   JSONWriter,
+					SuccessCode:     http.StatusOK,
+				},
 			},
 		).
 		ServeHTTP(w, r)

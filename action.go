@@ -12,11 +12,13 @@ type Action[T, U any] func(context.Context, T, func(ParamSource, string) string)
 // With allows change default Action behaviour with options.
 func (handle Action[T, U]) With(opts ...func(*ActionOptions)) http.Handler {
 	options := ActionOptions{
-		LogError:           func(context.Context, error, string) {},
-		ErrorHandlers:      []ErrorHandler{},
-		RequestURLParam:    func(*http.Request, string) string { return "" },
-		WriteResponse:      JSONWriter,
-		SuccessCode:        http.StatusOK,
+		Options: Options{
+			LogError:        func(context.Context, error, string) {},
+			ErrorHandlers:   []ErrorHandler{},
+			RequestURLParam: func(*http.Request, string) string { return "" },
+			WriteResponse:   JSONWriter,
+			SuccessCode:     http.StatusOK,
+		},
 		ReadRequestContent: JSONBodyReader,
 	}
 	for _, option := range opts {
@@ -30,11 +32,13 @@ func (handle Action[T, U]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	handle.
 		getHttpHandle(
 			&ActionOptions{
-				LogError:           func(context.Context, error, string) {},
-				ErrorHandlers:      []ErrorHandler{},
-				RequestURLParam:    func(*http.Request, string) string { return "" },
-				WriteResponse:      JSONWriter,
-				SuccessCode:        http.StatusOK,
+				Options: Options{
+					LogError:        func(context.Context, error, string) {},
+					ErrorHandlers:   []ErrorHandler{},
+					RequestURLParam: func(*http.Request, string) string { return "" },
+					WriteResponse:   JSONWriter,
+					SuccessCode:     http.StatusOK,
+				},
 				ReadRequestContent: JSONBodyReader,
 			},
 		).

@@ -5,45 +5,8 @@ import (
 	"net/http"
 )
 
-type ActionOptions struct {
-	ReadRequestContent func(*http.Request, any) error
-	RequestURLParam    func(*http.Request, string) string
-	LogError           func(context.Context, error, string)
-	WriteResponse      func(
-		context.Context, http.ResponseWriter,
-		func(context.Context, error, string),
-		int, any,
-	)
-
-	ErrorHandlers []ErrorHandler
-	SuccessCode   int
-}
-
-func ActionHTTPStatus(code int) func(*ActionOptions) {
-	return func(opts *ActionOptions) { opts.SuccessCode = code }
-}
-
-func ActionURLParamReader(r func(*http.Request, string) string) func(*ActionOptions) {
-	return func(opts *ActionOptions) { opts.RequestURLParam = r }
-}
-
-func ActionErrorLogger(log func(context.Context, error, string)) func(*ActionOptions) {
-	return func(opts *ActionOptions) { opts.LogError = log }
-}
-
-func ActionAppError(handler ErrorHandler) func(*ActionOptions) {
-	return func(opts *ActionOptions) { opts.ErrorHandlers = append(opts.ErrorHandlers, handler) }
-}
-
-func ActionResponseWriter(w ResponseWriter) func(*ActionOptions) {
-	return func(opts *ActionOptions) { opts.WriteResponse = w }
-}
-
-func ActionRequestContentReader(r RequestReader) func(*ActionOptions) {
-	return func(opts *ActionOptions) { opts.ReadRequestContent = r }
-}
-
-type TaskOptions struct {
+// Shared Action and Task options.
+type Options struct {
 	RequestURLParam func(*http.Request, string) string
 	LogError        func(context.Context, error, string)
 	WriteResponse   func(
@@ -56,22 +19,56 @@ type TaskOptions struct {
 	SuccessCode   int
 }
 
-func TaskHTTPStatus(code int) func(*TaskOptions) {
-	return func(opts *TaskOptions) { opts.SuccessCode = code }
+func (o *Options) Set(update func(*Options)) {
+	update(o)
 }
 
-func TaskURLParamReader(r func(*http.Request, string) string) func(*TaskOptions) {
-	return func(opts *TaskOptions) { opts.RequestURLParam = r }
+//  Task options.
+type TaskOptions struct {
+	Options
 }
 
-func TaskErrorLogger(log func(context.Context, error, string)) func(*TaskOptions) {
-	return func(opts *TaskOptions) { opts.LogError = log }
+//  Action options.
+type ActionOptions struct {
+	Options
+
+	ReadRequestContent func(*http.Request, any) error
 }
 
-func TaskAppError(handler ErrorHandler) func(*TaskOptions) {
-	return func(opts *TaskOptions) { opts.ErrorHandlers = append(opts.ErrorHandlers, handler) }
+//  Task and Action Options union type.
+type Option interface {
+	*TaskOptions | *ActionOptions
+	Set(func(*Options))
 }
 
-func TaskResponseWriter(w ResponseWriter) func(*TaskOptions) {
-	return func(opts *TaskOptions) { opts.WriteResponse = w }
+// Sets success response HTTP Status Code.
+func HTTPStatus[O Option](code int) func(O) {
+	return func(o O) { o.Set(func(opts *Options) { opts.SuccessCode = code }) }
+}
+
+// Sets URL parameters reader.
+func URLParamReader[O Option](r func(*http.Request, string) string) func(O) {
+	return func(o O) { o.Set(func(opts *Options) { opts.RequestURLParam = r }) }
+}
+
+// Sets logger to log error results.
+func ErrorLogger[O Option](log func(context.Context, error, string)) func(O) {
+	return func(o O) { o.Set(func(opts *Options) { opts.LogError = log }) }
+}
+
+// Sets error handlers to return specific to each error HTTP Status Codes.
+func ErrorHandlers[O Option](handlers ...ErrorHandler) func(O) {
+	return func(o O) {
+		o.Set(func(opts *Options) { opts.ErrorHandlers = append(opts.ErrorHandlers, handlers...) })
+	}
+}
+
+// Sets response writer.
+func ResponseWriter[O Option](w WriteResponse) func(O) {
+	return func(o O) { o.Set(func(opts *Options) { opts.WriteResponse = w }) }
+}
+
+// Sets requests content reader.
+func RequestContentReader(r ReadRequest) func(*ActionOptions) {
+	return func(opts *ActionOptions) { opts.ReadRequestContent = r }
 }

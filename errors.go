@@ -9,9 +9,9 @@ import (
 // ErrorHandler transforms error to HTTP status code and response body.
 type ErrorHandler func(error, ReadParam) (int, any)
 
-// HandleError checks if error is of E type
+// IfError checks if error is of E type
 // and returns designated HTTP Status Code with E instance as a response if true.
-func HandleError[E any](httpCode int) ErrorHandler {
+func IfError[E any](httpCode int) ErrorHandler {
 	return func(err error, readParam ReadParam) (int, any) {
 		var target E
 		if errors.As(err, &target) {
@@ -22,9 +22,9 @@ func HandleError[E any](httpCode int) ErrorHandler {
 	}
 }
 
-// HandleErrorAs checks if error is of E type
+// IfErrorAs checks if error is of E type
 // and returns designated HTTP Status Code with transformed response using as callback if true.
-func HandleErrorAs[E any](httpCode int, as func(E, ReadParam) any) ErrorHandler {
+func IfErrorAs[E any](as func(E, ReadParam) any, httpCode int) ErrorHandler {
 	return func(err error, readParam ReadParam) (int, any) {
 		var target E
 		if errors.As(err, &target) {

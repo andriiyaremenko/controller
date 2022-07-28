@@ -8,7 +8,7 @@ import (
 )
 
 // Response writer type.
-type ResponseWriter func(
+type WriteResponse func(
 	context.Context, http.ResponseWriter,
 	func(context.Context, error, string),
 	int, any,
@@ -44,7 +44,7 @@ func JSONWriter(
 
 // Response writer to write Form Data response
 // in body with Content-Type "application/x-www-form-urlencoded" Header.
-func FormWriter(encode func(any, url.Values) error) ResponseWriter {
+func FormWriter(encode func(any, url.Values) error) WriteResponse {
 	return func(
 		ctx context.Context, w http.ResponseWriter,
 		logError func(context.Context, error, string),

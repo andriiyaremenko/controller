@@ -43,7 +43,7 @@ var _ = Describe("Task", func() {
 	It("should use WithHTTPStatusCode option", func() {
 		task := controller.
 			Task[string](h).
-			With(controller.TaskHTTPStatus(http.StatusCreated))
+			With(controller.HTTPStatus[*controller.TaskOptions](http.StatusCreated))
 		ts := httptest.NewServer(task)
 
 		defer ts.Close()
@@ -76,13 +76,14 @@ var _ = Describe("Task", func() {
 		task := controller.
 			Task[string](h).
 			With(
-				controller.TaskURLParamReader(func(_ *http.Request, key string) string {
-					if key == "test" {
-						return "test"
-					}
+				controller.URLParamReader[*controller.TaskOptions](
+					func(_ *http.Request, key string) string {
+						if key == "test" {
+							return "test"
+						}
 
-					return ""
-				}),
+						return ""
+					}),
 			)
 		ts := httptest.NewServer(task)
 
@@ -145,8 +146,8 @@ var _ = Describe("Task", func() {
 		}
 		task := controller.
 			Task[string](h).
-			With(controller.TaskAppError(
-				controller.HandleError[*testError](http.StatusBadRequest)),
+			With(controller.ErrorHandlers[*controller.TaskOptions](
+				controller.IfError[*testError](http.StatusBadRequest)),
 			)
 		ts := httptest.NewServer(task)
 
@@ -179,12 +180,13 @@ var _ = Describe("Task", func() {
 		action := controller.
 			Task[string](h).
 			With(
-				controller.TaskAppError(
-					controller.HandleErrorAs(
-						http.StatusConflict,
+				controller.ErrorHandlers[*controller.TaskOptions](
+					controller.IfError[*testError](http.StatusBadRequest),
+					controller.IfErrorAs(
 						func(err error, _ controller.ReadParam) any {
 							return &testError{Detail: err.Error()}
 						},
+						http.StatusConflict,
 					),
 				),
 			)
@@ -218,14 +220,16 @@ var _ = Describe("Task", func() {
 		task := controller.
 			Task[string](h).
 			With(
-				controller.TaskAppError(
-					controller.HandleError[*testError](http.StatusBadRequest),
+				controller.ErrorHandlers[*controller.TaskOptions](
+					controller.IfError[*testError](http.StatusBadRequest),
 				),
-				controller.TaskErrorLogger(func(_ context.Context, err error, message string) {
-					Expect(err).Should(BeAssignableToTypeOf(new(testError)))
-					Expect(err.(*testError).Detail).To(Equal("oops"))
-					Expect(message).To(Equal("request failed"))
-				}),
+				controller.ErrorLogger[*controller.TaskOptions](
+					func(_ context.Context, err error, message string) {
+						Expect(err).Should(BeAssignableToTypeOf(new(testError)))
+						Expect(err.(*testError).Detail).To(Equal("oops"))
+						Expect(message).To(Equal("request failed"))
+					},
+				),
 			)
 		ts := httptest.NewServer(task)
 
@@ -253,7 +257,7 @@ var _ = Describe("Task", func() {
 		task := controller.
 			Task[string](h).
 			With(
-				controller.TaskResponseWriter(func(
+				controller.ResponseWriter[*controller.TaskOptions](func(
 					ctx context.Context, w http.ResponseWriter,
 					logError func(context.Context, error, string),
 					status int, data any,
