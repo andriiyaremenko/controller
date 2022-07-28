@@ -84,7 +84,6 @@ func main() {
 					),
 				),
 				controller.ErrorLogger[*controller.TaskOptions](logError),
-				controller.HTTPStatus[*controller.TaskOptions](http.StatusCreated),
 		),
 	)
 
