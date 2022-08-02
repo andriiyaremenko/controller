@@ -287,4 +287,40 @@ var _ = Describe("Task", func() {
 		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
 		Expect(result).To(Equal("success"))
 	})
+
+	It("should use Defaults option", func() {
+		responseWriterCalled := false
+		defaults := controller.Defaults(
+			controller.ResponseWriter[*controller.Options](func(
+				ctx context.Context, w http.ResponseWriter,
+				logError func(context.Context, error, string),
+				status int, data any,
+			) {
+				responseWriterCalled = true
+				controller.JSONWriter(ctx, w, logError, status, data)
+			}),
+		)
+
+		action := controller.Task[string](h).With(controller.As[*controller.TaskOptions](defaults))
+		ts := httptest.NewServer(action)
+
+		defer ts.Close()
+
+		resp, err := http.Get(fmt.Sprintf("%s", ts.URL))
+
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+		defer resp.Body.Close()
+
+		b, err := io.ReadAll(resp.Body)
+
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(responseWriterCalled).To(BeTrue())
+
+		var result string
+
+		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
+		Expect(result).To(Equal("success"))
+	})
 })

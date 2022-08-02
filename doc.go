@@ -48,41 +48,32 @@ func main() {
 	logError := func(_ context.Context, err error, message string) {
 		log.Printf("error: %s, message: %s\n", err, message)
 	}
+	defaults := controller.Defaults(
+		controller.URLParamReader[*controller.Options](chi.URLParam),
+		controller.ErrorHandlers[*controller.Options](
+			controller.IfError[*testError](http.StatusBadRequest),
+			controller.IfErrorUse(
+				func(err error, _ controller.ReadParam) any {
+					return &testError{Detail: err.Error()}
+				},
+				http.StatusConflict,
+			),
+		),
+		controller.ErrorLogger[*controller.Options](logError),
+	)
 
 	r.Post(
 		"/", controller.
 			Action[MyModel, ResponseModel](action).
 			With(
-				controller.URLParamReader[*controller.ActionOptions](chi.URLParam),
-				controller.ErrorHandlers[*controller.ActionOptions](
-					controller.IfError[*testError](http.StatusBadRequest),
-					controller.IfErrorUse(
-						func(err error, _ controller.ReadParam) any {
-							return &testError{Detail: err.Error()}
-						},
-						http.StatusConflict,
-					),
-				),
-				controller.ErrorLogger[*controller.ActionOptions](logError),
+				controller.As[*controller.ActionOptions](defaults),
 				controller.HTTPStatus[*controller.ActionOptions](http.StatusCreated),
-		),
+			),
 	)
 	r.Get(
 		"/", controller.
 			Task[ResponseModel](task).
-			With(
-				controller.URLParamReader[*controller.TaskOptions](chi.URLParam),
-				controller.ErrorHandlers[*controller.TaskOptions](
-					controller.IfError[*testError](http.StatusBadRequest),
-					controller.IfErrorUse(
-						func(err error, _ controller.ReadParam) any {
-							return &testError{Detail: err.Error()}
-						},
-						http.StatusConflict,
-					),
-				),
-				controller.ErrorLogger[*controller.TaskOptions](logError),
-		),
+			With(controller.As[*controller.TaskOptions](defaults)),
 	)
 
 	http.ListenAndServe(":3000", r)

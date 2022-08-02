@@ -377,4 +377,56 @@ var _ = Describe("Action", func() {
 		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
 		Expect(result).To(Equal("success"))
 	})
+
+	It("should use Defaults option", func() {
+		requestReaderCalled := false
+		responseWriterCalled := false
+		defaults := controller.Defaults(
+			controller.RequestContentReader(func(req *http.Request, model any) error {
+				requestReaderCalled = true
+				return controller.JSONBodyReader(req, model)
+			}),
+			controller.ResponseWriter[*controller.ActionOptions](func(
+				ctx context.Context, w http.ResponseWriter,
+				logError func(context.Context, error, string),
+				status int, data any,
+			) {
+				responseWriterCalled = true
+				controller.JSONWriter(ctx, w, logError, status, data)
+			}),
+		)
+
+		action := controller.
+			Action[string, string](h).
+			With(
+				defaults,
+				controller.HTTPStatus[*controller.ActionOptions](http.StatusCreated),
+			)
+
+		ts := httptest.NewServer(action)
+
+		defer ts.Close()
+
+		resp, err := http.Post(
+			fmt.Sprintf("%s", ts.URL),
+			"application/json; charset=utf-8",
+			strings.NewReader(requestBody),
+		)
+
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+
+		defer resp.Body.Close()
+
+		b, err := io.ReadAll(resp.Body)
+
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(requestReaderCalled).To(BeTrue())
+		Expect(responseWriterCalled).To(BeTrue())
+
+		var result string
+
+		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
+		Expect(result).To(Equal("success"))
+	})
 })

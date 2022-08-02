@@ -37,7 +37,7 @@ type ActionOptions struct {
 
 //  Task and Action Options union type.
 type Option interface {
-	*TaskOptions | *ActionOptions
+	*Options | *TaskOptions | *ActionOptions
 	Set(func(*Options))
 }
 
@@ -66,6 +66,21 @@ func ErrorHandlers[O Option](handlers ...ErrorHandler) func(O) {
 // Sets response writer.
 func ResponseWriter[O Option](w WriteResponse) func(O) {
 	return func(o O) { o.Set(func(opts *Options) { opts.WriteResponse = w }) }
+}
+
+// Option to transform generic func(*controller.Options)
+// to func(*controller.ActionOptions) or func(*controller.TaskOptions)
+func As[O Option](opts func(*Options)) func(O) {
+	return func(o O) { o.Set(opts) }
+}
+
+// Option to bind several options into one to share as default settings.
+func Defaults[O Option](opts ...func(O)) func(O) {
+	return func(o O) {
+		for _, opt := range opts {
+			opt(o)
+		}
+	}
 }
 
 // Sets requests content reader.
