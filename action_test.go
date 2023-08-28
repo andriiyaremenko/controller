@@ -60,7 +60,7 @@ var _ = Describe("Action", func() {
 	It("should use WithHTTPStatusCode option", func() {
 		action := controller.
 			Action[string, string](h).
-			With(controller.HTTPStatus[*controller.ActionOptions](http.StatusCreated))
+			With(controller.HTTPStatus(http.StatusCreated))
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -96,7 +96,7 @@ var _ = Describe("Action", func() {
 		action := controller.
 			Action[string, string](h).
 			With(
-				controller.RequestParam[*controller.ActionOptions](
+				controller.RequestParam(
 					"test",
 					func(_ *http.Request, key string) string {
 						if key == "test" {
@@ -141,7 +141,7 @@ var _ = Describe("Action", func() {
 		}
 		action := controller.
 			Action[string, string](h).
-			With(controller.RequestParam[*controller.ActionOptions]("Test", controller.FromHeaders))
+			With(controller.RequestParam("Test", controller.FromHeaders))
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -177,9 +177,7 @@ var _ = Describe("Action", func() {
 		action := controller.
 			Action[string, string](h).
 			With(
-				controller.ErrorHandlers[*controller.ActionOptions](
-					controller.IfError[*testError](http.StatusBadRequest),
-				),
+				controller.ErrorHandlers(controller.IfError[*testError](http.StatusBadRequest)),
 			)
 		ts := httptest.NewServer(action)
 
@@ -215,7 +213,7 @@ var _ = Describe("Action", func() {
 		action := controller.
 			Action[string, string](h).
 			With(
-				controller.ErrorHandlers[*controller.ActionOptions](
+				controller.ErrorHandlers(
 					controller.IfError[*testError](http.StatusBadRequest),
 					controller.IfErrorUse(
 						func(_ context.Context, err error) any {
@@ -259,10 +257,10 @@ var _ = Describe("Action", func() {
 		action := controller.
 			Action[string, string](h).
 			With(
-				controller.ErrorHandlers[*controller.ActionOptions](
+				controller.ErrorHandlers(
 					controller.IfError[*testError](http.StatusBadRequest),
 				),
-				controller.ErrorLogger[*controller.ActionOptions](
+				controller.ErrorLogger(
 					func(_ context.Context, err error, message string) {
 						Expect(err).Should(BeAssignableToTypeOf(new(testError)))
 						Expect(err.(*testError).Detail).To(Equal("oops"))
@@ -334,7 +332,7 @@ var _ = Describe("Action", func() {
 		action := controller.
 			Action[string, string](h).
 			With(
-				controller.ResponseWriter[*controller.ActionOptions](func(
+				controller.ResponseWriter(func(
 					ctx context.Context, w http.ResponseWriter,
 					logError func(context.Context, error, string),
 					status int, data any,
@@ -362,58 +360,6 @@ var _ = Describe("Action", func() {
 
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(called).To(BeTrue())
-
-		var result string
-
-		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
-		Expect(result).To(Equal("success"))
-	})
-
-	It("should use Defaults option", func() {
-		requestReaderCalled := false
-		responseWriterCalled := false
-		defaults := controller.Defaults(
-			controller.RequestContentReader(func(req *http.Request, model any) error {
-				requestReaderCalled = true
-				return controller.JSONBodyReader(req, model)
-			}),
-			controller.ResponseWriter[*controller.ActionOptions](func(
-				ctx context.Context, w http.ResponseWriter,
-				logError func(context.Context, error, string),
-				status int, data any,
-			) {
-				responseWriterCalled = true
-				controller.JSONWriter(ctx, w, logError, status, data)
-			}),
-		)
-
-		action := controller.
-			Action[string, string](h).
-			With(
-				defaults,
-				controller.HTTPStatus[*controller.ActionOptions](http.StatusCreated),
-			)
-
-		ts := httptest.NewServer(action)
-
-		defer ts.Close()
-
-		resp, err := http.Post(
-			fmt.Sprintf("%s", ts.URL),
-			"application/json; charset=utf-8",
-			strings.NewReader(requestBody),
-		)
-
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
-
-		defer resp.Body.Close()
-
-		b, err := io.ReadAll(resp.Body)
-
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(requestReaderCalled).To(BeTrue())
-		Expect(responseWriterCalled).To(BeTrue())
 
 		var result string
 

@@ -43,7 +43,7 @@ var _ = Describe("Task", func() {
 	It("should use WithHTTPStatusCode option", func() {
 		task := controller.
 			Task[string](h).
-			With(controller.HTTPStatus[*controller.TaskOptions](http.StatusCreated))
+			With(controller.HTTPStatus(http.StatusCreated))
 		ts := httptest.NewServer(task)
 
 		defer ts.Close()
@@ -74,7 +74,7 @@ var _ = Describe("Task", func() {
 		task := controller.
 			Task[string](h).
 			With(
-				controller.RequestParam[*controller.TaskOptions](
+				controller.RequestParam(
 					"test",
 					func(_ *http.Request, key string) string {
 						if key == "test" {
@@ -113,7 +113,7 @@ var _ = Describe("Task", func() {
 		}
 		task := controller.
 			Task[string](h).
-			With(controller.RequestParam[*controller.TaskOptions]("Test", controller.FromHeaders))
+			With(controller.RequestParam("Test", controller.FromHeaders))
 		ts := httptest.NewServer(task)
 
 		defer ts.Close()
@@ -145,7 +145,7 @@ var _ = Describe("Task", func() {
 		}
 		task := controller.
 			Task[string](h).
-			With(controller.ErrorHandlers[*controller.TaskOptions](
+			With(controller.ErrorHandlers(
 				controller.IfError[*testError](http.StatusBadRequest)),
 			)
 		ts := httptest.NewServer(task)
@@ -176,7 +176,7 @@ var _ = Describe("Task", func() {
 		action := controller.
 			Task[string](h).
 			With(
-				controller.ErrorHandlers[*controller.TaskOptions](
+				controller.ErrorHandlers(
 					controller.IfError[*testError](http.StatusBadRequest),
 					controller.IfErrorUse(
 						func(_ context.Context, err error) any {
@@ -214,10 +214,10 @@ var _ = Describe("Task", func() {
 		task := controller.
 			Task[string](h).
 			With(
-				controller.ErrorHandlers[*controller.TaskOptions](
+				controller.ErrorHandlers(
 					controller.IfError[*testError](http.StatusBadRequest),
 				),
-				controller.ErrorLogger[*controller.TaskOptions](
+				controller.ErrorLogger(
 					func(_ context.Context, err error, message string) {
 						Expect(err).Should(BeAssignableToTypeOf(new(testError)))
 						Expect(err.(*testError).Detail).To(Equal("oops"))
@@ -251,7 +251,7 @@ var _ = Describe("Task", func() {
 		task := controller.
 			Task[string](h).
 			With(
-				controller.ResponseWriter[*controller.TaskOptions](func(
+				controller.ResponseWriter(func(
 					ctx context.Context, w http.ResponseWriter,
 					logError func(context.Context, error, string),
 					status int, data any,
@@ -275,42 +275,6 @@ var _ = Describe("Task", func() {
 
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(called).To(BeTrue())
-
-		var result string
-
-		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
-		Expect(result).To(Equal("success"))
-	})
-
-	It("should use Defaults option", func() {
-		responseWriterCalled := false
-		defaults := controller.Defaults(
-			controller.ResponseWriter[*controller.Options](func(
-				ctx context.Context, w http.ResponseWriter,
-				logError func(context.Context, error, string),
-				status int, data any,
-			) {
-				responseWriterCalled = true
-				controller.JSONWriter(ctx, w, logError, status, data)
-			}),
-		)
-
-		action := controller.Task[string](h).With(controller.As[*controller.TaskOptions](defaults))
-		ts := httptest.NewServer(action)
-
-		defer ts.Close()
-
-		resp, err := http.Get(fmt.Sprintf("%s", ts.URL))
-
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-
-		defer resp.Body.Close()
-
-		b, err := io.ReadAll(resp.Body)
-
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(responseWriterCalled).To(BeTrue())
 
 		var result string
 

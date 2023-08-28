@@ -5,85 +5,82 @@ import (
 	"net/http"
 )
 
+type Options interface {
+	SetSuccessCode(int)
+	SetReadRequestParam(string, func(*http.Request, string) string)
+	SetErrorLogger(func(context.Context, error, string))
+	SetErrorHandlers(...ErrorHandler)
+	SetWriteResponse(WriteResponse)
+	SetReadRequestContent(ReadRequest)
+}
+
 // Shared Action and Task options.
-type Options struct {
-	ReadRequestParam map[string]func(*http.Request, string) string
-	LogError         func(context.Context, error, string)
-	WriteResponse    func(
+type options struct {
+	readRequestParam map[string]func(*http.Request, string) string
+	logError         func(context.Context, error, string)
+	writeResponse    func(
 		context.Context, http.ResponseWriter,
 		func(context.Context, error, string),
 		int, any,
 	)
 
-	ErrorHandlers []ErrorHandler
-	SuccessCode   int
+	errorHandlers      []ErrorHandler
+	successCode        int
+	readRequestContent ReadRequest
 }
 
-func (o *Options) Set(update func(*Options)) {
-	update(o)
+func (o *options) SetSuccessCode(code int) {
+	o.successCode = code
 }
 
-// Task options.
-type TaskOptions struct {
-	Options
+func (o *options) SetReadRequestParam(key string, fn func(*http.Request, string) string) {
+	o.readRequestParam[key] = fn
 }
 
-// Action options.
-type ActionOptions struct {
-	Options
-
-	ReadRequestContent func(*http.Request, any) error
+func (o *options) SetErrorLogger(log func(context.Context, error, string)) {
+	o.logError = log
 }
 
-// Task and Action Options union type.
-type Option interface {
-	*Options | *TaskOptions | *ActionOptions
-	Set(func(*Options))
+func (o *options) SetErrorHandlers(handlers ...ErrorHandler) {
+	o.errorHandlers = append(o.errorHandlers, handlers...)
+}
+
+func (o *options) SetWriteResponse(w WriteResponse) {
+	o.writeResponse = w
+}
+
+func (o *options) SetReadRequestContent(r ReadRequest) {
+	o.readRequestContent = r
 }
 
 // Sets success response HTTP Status Code.
-func HTTPStatus[O Option](code int) func(O) {
-	return func(o O) { o.Set(func(opts *Options) { opts.SuccessCode = code }) }
+func HTTPStatus(code int) func(Options) {
+	return func(o Options) { o.SetSuccessCode(code) }
 }
 
 // Sets URL parameters reader.
-func RequestParam[O Option](key string, fn func(*http.Request, string) string) func(O) {
-	return func(o O) { o.Set(func(opts *Options) { opts.ReadRequestParam[key] = fn }) }
+func RequestParam(key string, fn func(*http.Request, string) string) func(Options) {
+	return func(o Options) { o.SetReadRequestParam(key, fn) }
 }
 
 // Sets logger to log error results.
-func ErrorLogger[O Option](log func(context.Context, error, string)) func(O) {
-	return func(o O) { o.Set(func(opts *Options) { opts.LogError = log }) }
+func ErrorLogger(log func(context.Context, error, string)) func(Options) {
+	return func(o Options) { o.SetErrorLogger(log) }
 }
 
 // Sets error handlers to return specific to each error HTTP Status Codes.
-func ErrorHandlers[O Option](handlers ...ErrorHandler) func(O) {
-	return func(o O) {
-		o.Set(func(opts *Options) { opts.ErrorHandlers = append(opts.ErrorHandlers, handlers...) })
+func ErrorHandlers(handlers ...ErrorHandler) func(Options) {
+	return func(o Options) {
+		o.SetErrorHandlers(handlers...)
 	}
 }
 
 // Sets response writer.
-func ResponseWriter[O Option](w WriteResponse) func(O) {
-	return func(o O) { o.Set(func(opts *Options) { opts.WriteResponse = w }) }
-}
-
-// Option to transform generic func(*controller.Options)
-// to func(*controller.ActionOptions) or func(*controller.TaskOptions)
-func As[O Option](opts func(*Options)) func(O) {
-	return func(o O) { o.Set(opts) }
-}
-
-// Option to bind several options into one to share as default settings.
-func Defaults[O Option](opts ...func(O)) func(O) {
-	return func(o O) {
-		for _, opt := range opts {
-			opt(o)
-		}
-	}
+func ResponseWriter(w WriteResponse) func(Options) {
+	return func(o Options) { o.SetWriteResponse(w) }
 }
 
 // Sets requests content reader.
-func RequestContentReader(r ReadRequest) func(*ActionOptions) {
-	return func(opts *ActionOptions) { opts.ReadRequestContent = r }
+func RequestContentReader(r ReadRequest) func(Options) {
+	return func(o Options) { o.SetReadRequestContent(r) }
 }

@@ -9,15 +9,13 @@ import (
 type Task[T any] func(context.Context) (T, error)
 
 // With allows change default Action behaviour with options.
-func (handle Task[T]) With(opts ...func(*TaskOptions)) http.Handler {
-	options := TaskOptions{
-		Options: Options{
-			LogError:         func(context.Context, error, string) {},
-			ErrorHandlers:    []ErrorHandler{},
-			ReadRequestParam: map[string]func(*http.Request, string) string{},
-			WriteResponse:    JSONWriter,
-			SuccessCode:      http.StatusOK,
-		},
+func (handle Task[T]) With(opts ...func(Options)) http.Handler {
+	options := options{
+		logError:         func(context.Context, error, string) {},
+		errorHandlers:    []ErrorHandler{},
+		readRequestParam: map[string]func(*http.Request, string) string{},
+		writeResponse:    JSONWriter,
+		successCode:      http.StatusOK,
 	}
 	for _, option := range opts {
 		option(&options)
@@ -29,39 +27,37 @@ func (handle Task[T]) With(opts ...func(*TaskOptions)) http.Handler {
 func (handle Task[T]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	handle.
 		getHttpHandle(
-			&TaskOptions{
-				Options: Options{
-					LogError:         func(context.Context, error, string) {},
-					ErrorHandlers:    []ErrorHandler{},
-					ReadRequestParam: map[string]func(*http.Request, string) string{},
-					WriteResponse:    JSONWriter,
-					SuccessCode:      http.StatusOK,
-				},
+			&options{
+				logError:         func(context.Context, error, string) {},
+				errorHandlers:    []ErrorHandler{},
+				readRequestParam: map[string]func(*http.Request, string) string{},
+				writeResponse:    JSONWriter,
+				successCode:      http.StatusOK,
 			},
 		).
 		ServeHTTP(w, r)
 }
 
-func (handle Task[T]) getHttpHandle(opts *TaskOptions) http.HandlerFunc {
+func (handle Task[T]) getHttpHandle(opts *options) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		params := map[string]string{}
 
-		for key, fn := range opts.ReadRequestParam {
+		for key, fn := range opts.readRequestParam {
 			params[key] = fn(r, key)
 		}
 
 		ctx = setContextParam(ctx, params)
 		result, err := handle(ctx)
 		if err != nil {
-			code, response := getErrorResponse(ctx, err, opts.ErrorHandlers)
+			code, response := getErrorResponse(ctx, err, opts.errorHandlers)
 
-			opts.LogError(ctx, err, "request failed")
-			opts.WriteResponse(ctx, w, opts.LogError, code, response)
+			opts.logError(ctx, err, "request failed")
+			opts.writeResponse(ctx, w, opts.logError, code, response)
 
 			return
 		}
 
-		opts.WriteResponse(ctx, w, opts.LogError, opts.SuccessCode, result)
+		opts.writeResponse(ctx, w, opts.logError, opts.successCode, result)
 	}
 }

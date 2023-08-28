@@ -10,16 +10,14 @@ import (
 type Action[T, U any] func(context.Context, T) (U, error)
 
 // With allows change default Action behaviour with options.
-func (handle Action[T, U]) With(opts ...func(*ActionOptions)) http.Handler {
-	options := ActionOptions{
-		Options: Options{
-			LogError:         func(context.Context, error, string) {},
-			ErrorHandlers:    []ErrorHandler{},
-			ReadRequestParam: map[string]func(*http.Request, string) string{},
-			WriteResponse:    JSONWriter,
-			SuccessCode:      http.StatusOK,
-		},
-		ReadRequestContent: JSONBodyReader,
+func (handle Action[T, U]) With(opts ...func(Options)) http.Handler {
+	options := options{
+		logError:           func(context.Context, error, string) {},
+		errorHandlers:      []ErrorHandler{},
+		readRequestParam:   map[string]func(*http.Request, string) string{},
+		writeResponse:      JSONWriter,
+		successCode:        http.StatusOK,
+		readRequestContent: JSONBodyReader,
 	}
 	for _, option := range opts {
 		option(&options)
@@ -31,51 +29,49 @@ func (handle Action[T, U]) With(opts ...func(*ActionOptions)) http.Handler {
 func (handle Action[T, U]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	handle.
 		getHttpHandle(
-			&ActionOptions{
-				Options: Options{
-					LogError:         func(context.Context, error, string) {},
-					ErrorHandlers:    []ErrorHandler{},
-					ReadRequestParam: map[string]func(*http.Request, string) string{},
-					WriteResponse:    JSONWriter,
-					SuccessCode:      http.StatusOK,
-				},
-				ReadRequestContent: JSONBodyReader,
+			&options{
+				logError:           func(context.Context, error, string) {},
+				errorHandlers:      []ErrorHandler{},
+				readRequestParam:   map[string]func(*http.Request, string) string{},
+				writeResponse:      JSONWriter,
+				successCode:        http.StatusOK,
+				readRequestContent: JSONBodyReader,
 			},
 		).
 		ServeHTTP(w, r)
 }
 
-func (handle Action[T, U]) getHttpHandle(opts *ActionOptions) http.HandlerFunc {
+func (handle Action[T, U]) getHttpHandle(opts *options) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		params := map[string]string{}
 
-		for key, fn := range opts.ReadRequestParam {
+		for key, fn := range opts.readRequestParam {
 			params[key] = fn(r, key)
 		}
 
 		ctx = setContextParam(ctx, params)
 
 		var model T
-		if err := opts.ReadRequestContent(r, &model); err != nil {
-			code, response := getErrorResponse(ctx, err, opts.ErrorHandlers)
+		if err := opts.readRequestContent(r, &model); err != nil {
+			code, response := getErrorResponse(ctx, err, opts.errorHandlers)
 
-			opts.LogError(ctx, err, "failed to read request content")
-			opts.WriteResponse(ctx, w, opts.LogError, code, response)
+			opts.logError(ctx, err, "failed to read request content")
+			opts.writeResponse(ctx, w, opts.logError, code, response)
 
 			return
 		}
 
 		result, err := handle(ctx, model)
 		if err != nil {
-			code, response := getErrorResponse(ctx, err, opts.ErrorHandlers)
+			code, response := getErrorResponse(ctx, err, opts.errorHandlers)
 
-			opts.LogError(ctx, err, "request failed")
-			opts.WriteResponse(ctx, w, opts.LogError, code, response)
+			opts.logError(ctx, err, "request failed")
+			opts.writeResponse(ctx, w, opts.logError, code, response)
 
 			return
 		}
 
-		opts.WriteResponse(ctx, w, opts.LogError, opts.SuccessCode, result)
+		opts.writeResponse(ctx, w, opts.logError, opts.successCode, result)
 	}
 }

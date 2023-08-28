@@ -46,9 +46,9 @@ func main() {
 	logError := func(_ context.Context, err error, message string) {
 		log.Printf("error: %s, message: %s\n", err, message)
 	}
-	defaults := controller.Defaults(
-		controller.RequestParam[*controller.Options]("request-id", chi.URLParam),
-		controller.ErrorHandlers[*controller.Options](
+	defaults := []controller.Options{
+		controller.RequestParam("request-id", chi.URLParam),
+		controller.ErrorHandlers(
 			controller.IfError[*testError](http.StatusBadRequest),
 			controller.IfErrorUse(
 				func(_ context.Context, err error) any {
@@ -57,22 +57,15 @@ func main() {
 				http.StatusConflict,
 			),
 		),
-		controller.ErrorLogger[*controller.Options](logError),
-	)
+		controller.ErrorLogger(logError),
+	}
 
 	r.Post(
 		"/", controller.
 			Action[MyModel, ResponseModel](action).
-			With(
-				controller.As[*controller.ActionOptions](defaults),
-				controller.HTTPStatus[*controller.ActionOptions](http.StatusCreated),
-			),
+			With(controller.HTTPStatus(http.StatusCreated), defaults...),
 	)
-	r.Get(
-		"/", controller.
-			Task[ResponseModel](task).
-			With(controller.As[*controller.TaskOptions](defaults)),
-	)
+	r.Get("/", controller.Task[ResponseModel](task).With(defaults...))
 
 	http.ListenAndServe(":3000", r)
 }
