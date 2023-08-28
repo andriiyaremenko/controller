@@ -21,11 +21,9 @@ import (
 
 func main() {
 	r := chi.NewRouter()
-	action := func(
-		ctx context.Context, requestModel MyModel, readParam func(controller.ParamSource, string) string,
-	) (ResponseModel, error) {
+	action := func(ctx context.Context, requestModel MyModel) (ResponseModel, error) {
 		service := SomeService(ctx)
-		result, err := service.Do(requestModel, readParam(command.FromHeader, "request-id"))
+		result, err := service.Do(requestModel, controller.ContextParam(ctx, "request-id"))
 
 		if err != nil {
 			return result, err
@@ -33,11 +31,9 @@ func main() {
 
 		return result, nil
 	}
-	task := func(
-		ctx context.Context, readParam func(controller.ParamSource, string) string,
-	) (ResponseModel, error) {
+	task := func(ctx context.Context) (ResponseModel, error) {
 		service := SomeQuery(ctx)
-		result, err := service.Do(readParam(command.FromHeader, "request-id"))
+		result, err := service.Do(controller.ContextParam(ctx, "request-id"))
 
 		if err != nil {
 			return result, err
@@ -53,7 +49,7 @@ func main() {
 		controller.ErrorHandlers[*controller.Options](
 			controller.IfError[*testError](http.StatusBadRequest),
 			controller.IfErrorUse(
-				func(err error, _ controller.ReadParam) any {
+				func(_ context.Context, err error) any {
 					return &testError{Detail: err.Error()}
 				},
 				http.StatusConflict,
