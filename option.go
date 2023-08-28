@@ -7,9 +7,9 @@ import (
 
 // Shared Action and Task options.
 type Options struct {
-	RequestURLParam func(*http.Request, string) string
-	LogError        func(context.Context, error, string)
-	WriteResponse   func(
+	ReadRequestParam map[string]func(*http.Request, string) string
+	LogError         func(context.Context, error, string)
+	WriteResponse    func(
 		context.Context, http.ResponseWriter,
 		func(context.Context, error, string),
 		int, any,
@@ -23,19 +23,19 @@ func (o *Options) Set(update func(*Options)) {
 	update(o)
 }
 
-//  Task options.
+// Task options.
 type TaskOptions struct {
 	Options
 }
 
-//  Action options.
+// Action options.
 type ActionOptions struct {
 	Options
 
 	ReadRequestContent func(*http.Request, any) error
 }
 
-//  Task and Action Options union type.
+// Task and Action Options union type.
 type Option interface {
 	*Options | *TaskOptions | *ActionOptions
 	Set(func(*Options))
@@ -47,8 +47,8 @@ func HTTPStatus[O Option](code int) func(O) {
 }
 
 // Sets URL parameters reader.
-func URLParamReader[O Option](r func(*http.Request, string) string) func(O) {
-	return func(o O) { o.Set(func(opts *Options) { opts.RequestURLParam = r }) }
+func RequestParam[O Option](key string, fn func(*http.Request, string) string) func(O) {
+	return func(o O) { o.Set(func(opts *Options) { opts.ReadRequestParam[key] = fn }) }
 }
 
 // Sets logger to log error results.

@@ -14,7 +14,7 @@ import (
 )
 
 var _ = Describe("Task", func() {
-	h := func(context.Context, func(controller.ParamSource, string) string) (string, error) {
+	h := func(context.Context) (string, error) {
 		return "success", nil
 	}
 
@@ -66,17 +66,16 @@ var _ = Describe("Task", func() {
 	})
 
 	It("should use WithURLParamReader option", func() {
-		h := func(
-			_ context.Context, readParam func(controller.ParamSource, string) string,
-		) (string, error) {
-			Expect(readParam(controller.FromURL, "test")).To(Equal("test"))
+		h := func(ctx context.Context) (string, error) {
+			Expect(controller.ContextParam(ctx, "test")).To(Equal("test"))
 
 			return "success", nil
 		}
 		task := controller.
 			Task[string](h).
 			With(
-				controller.URLParamReader[*controller.TaskOptions](
+				controller.RequestParam[*controller.TaskOptions](
+					"test",
 					func(_ *http.Request, key string) string {
 						if key == "test" {
 							return "test"
@@ -107,14 +106,14 @@ var _ = Describe("Task", func() {
 	})
 
 	It("should be able to read from Headers", func() {
-		h := func(
-			_ context.Context, readParam func(controller.ParamSource, string) string,
-		) (string, error) {
-			Expect(readParam(controller.FromHeaders, "Test")).To(Equal("test"))
+		h := func(ctx context.Context) (string, error) {
+			Expect(controller.ContextParam(ctx, "Test")).To(Equal("test"))
 
 			return "success", nil
 		}
-		task := controller.Task[string](h)
+		task := controller.
+			Task[string](h).
+			With(controller.RequestParam[*controller.TaskOptions]("Test", controller.FromHeaders))
 		ts := httptest.NewServer(task)
 
 		defer ts.Close()
@@ -141,7 +140,7 @@ var _ = Describe("Task", func() {
 	})
 
 	It("should use WithAppError option", func() {
-		h := func(context.Context, func(controller.ParamSource, string) string) (string, error) {
+		h := func(context.Context) (string, error) {
 			return "", &testError{Detail: "oops"}
 		}
 		task := controller.
@@ -171,10 +170,7 @@ var _ = Describe("Task", func() {
 	})
 
 	It("should use WithAppError option with mapping", func() {
-		h := func(
-			_ context.Context, _ func(controller.ParamSource, string) string,
-		) (string, error) {
-
+		h := func(_ context.Context) (string, error) {
 			return "", fmt.Errorf("oooh")
 		}
 		action := controller.
@@ -183,7 +179,7 @@ var _ = Describe("Task", func() {
 				controller.ErrorHandlers[*controller.TaskOptions](
 					controller.IfError[*testError](http.StatusBadRequest),
 					controller.IfErrorUse(
-						func(err error, _ controller.ReadParam) any {
+						func(_ context.Context, err error) any {
 							return &testError{Detail: err.Error()}
 						},
 						http.StatusConflict,
@@ -212,9 +208,7 @@ var _ = Describe("Task", func() {
 	})
 
 	It("should use WithErrorLogger option", func() {
-		h := func(
-			context.Context, func(controller.ParamSource, string) string,
-		) (string, error) {
+		h := func(context.Context) (string, error) {
 			return "", &testError{Detail: "oops"}
 		}
 		task := controller.

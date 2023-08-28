@@ -1,18 +1,19 @@
 package controller
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 )
 
 // ErrorHandler transforms error to HTTP status code and response body.
-type ErrorHandler func(error, ReadParam) (int, any)
+type ErrorHandler func(context.Context, error) (int, any)
 
 // IfError checks if error is of E type
 // and returns designated HTTP Status Code with E instance as a response if true.
 func IfError[E any](httpCode int) ErrorHandler {
-	return func(err error, readParam ReadParam) (int, any) {
+	return func(_ context.Context, err error) (int, any) {
 		var target E
 		if errors.As(err, &target) {
 			return httpCode, target
@@ -24,11 +25,11 @@ func IfError[E any](httpCode int) ErrorHandler {
 
 // IfErrorUse checks if error is of E type
 // and returns designated HTTP Status Code with transformed response using as callback if true.
-func IfErrorUse[E any](as func(E, ReadParam) any, httpCode int) ErrorHandler {
-	return func(err error, readParam ReadParam) (int, any) {
+func IfErrorUse[E any](as func(context.Context, E) any, httpCode int) ErrorHandler {
+	return func(ctx context.Context, err error) (int, any) {
 		var target E
 		if errors.As(err, &target) {
-			return httpCode, as(target, readParam)
+			return httpCode, as(ctx, target)
 		}
 
 		return 0, nil
@@ -48,9 +49,9 @@ func (err *ReadRequestError) Unwrap() error {
 	return err.err
 }
 
-func getErrorResponse(err error, paramReader ReadParam, handlers []ErrorHandler) (int, any) {
+func getErrorResponse(ctx context.Context, err error, handlers []ErrorHandler) (int, any) {
 	for _, handle := range handlers {
-		code, response := handle(err, paramReader)
+		code, response := handle(ctx, err)
 		if code != 0 {
 			return code, response
 		}

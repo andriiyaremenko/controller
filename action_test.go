@@ -24,9 +24,7 @@ func (e *testError) Error() string {
 
 var _ = Describe("Action", func() {
 	requestBody := `"Hello World"`
-	h := func(
-		_ context.Context, greet string, _ func(controller.ParamSource, string) string,
-	) (string, error) {
+	h := func(_ context.Context, greet string) (string, error) {
 		Expect(greet).To(Equal("Hello World"))
 
 		return "success", nil
@@ -89,18 +87,17 @@ var _ = Describe("Action", func() {
 	})
 
 	It("should use WithURLParamReader option", func() {
-		h := func(
-			_ context.Context, greet string, readParam func(controller.ParamSource, string) string,
-		) (string, error) {
+		h := func(ctx context.Context, greet string) (string, error) {
 			Expect(greet).To(Equal("Hello World"))
-			Expect(readParam(controller.FromURL, "test")).To(Equal("test"))
+			Expect(controller.ContextParam(ctx, "test")).To(Equal("test"))
 
 			return "success", nil
 		}
 		action := controller.
 			Action[string, string](h).
 			With(
-				controller.URLParamReader[*controller.ActionOptions](
+				controller.RequestParam[*controller.ActionOptions](
+					"test",
 					func(_ *http.Request, key string) string {
 						if key == "test" {
 							return "test"
@@ -136,15 +133,15 @@ var _ = Describe("Action", func() {
 	})
 
 	It("should be able to read from Headers", func() {
-		h := func(
-			_ context.Context, greet string, readParam func(controller.ParamSource, string) string,
-		) (string, error) {
+		h := func(ctx context.Context, greet string) (string, error) {
 			Expect(greet).To(Equal("Hello World"))
-			Expect(readParam(controller.FromHeaders, "Test")).To(Equal("test"))
+			Expect(controller.ContextParam(ctx, "Test")).To(Equal("test"))
 
 			return "success", nil
 		}
-		action := controller.Action[string, string](h)
+		action := controller.
+			Action[string, string](h).
+			With(controller.RequestParam[*controller.ActionOptions]("Test", controller.FromHeaders))
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -172,9 +169,7 @@ var _ = Describe("Action", func() {
 	})
 
 	It("should use WithAppError option", func() {
-		h := func(
-			_ context.Context, greet string, _ func(controller.ParamSource, string) string,
-		) (string, error) {
+		h := func(_ context.Context, greet string) (string, error) {
 			Expect(greet).To(Equal("Hello World"))
 
 			return "", &testError{Detail: "oops"}
@@ -212,9 +207,7 @@ var _ = Describe("Action", func() {
 	})
 
 	It("should use WithAppError option with mapping", func() {
-		h := func(
-			_ context.Context, greet string, _ func(controller.ParamSource, string) string,
-		) (string, error) {
+		h := func(_ context.Context, greet string) (string, error) {
 			Expect(greet).To(Equal("Hello World"))
 
 			return "", fmt.Errorf("oooh")
@@ -225,7 +218,7 @@ var _ = Describe("Action", func() {
 				controller.ErrorHandlers[*controller.ActionOptions](
 					controller.IfError[*testError](http.StatusBadRequest),
 					controller.IfErrorUse(
-						func(err error, _ controller.ReadParam) any {
+						func(_ context.Context, err error) any {
 							return &testError{Detail: err.Error()}
 						},
 						http.StatusConflict,
@@ -258,9 +251,7 @@ var _ = Describe("Action", func() {
 	})
 
 	It("should use WithErrorLogger option", func() {
-		h := func(
-			_ context.Context, greet string, _ func(controller.ParamSource, string) string,
-		) (string, error) {
+		h := func(_ context.Context, greet string) (string, error) {
 			Expect(greet).To(Equal("Hello World"))
 
 			return "", &testError{Detail: "oops"}
