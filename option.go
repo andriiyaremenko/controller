@@ -2,85 +2,75 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"net/http"
 )
 
 type Options interface {
-	SetSuccessCode(int)
-	SetReadRequestParam(string, func(*http.Request, string) string)
-	SetErrorLogger(func(context.Context, error, string))
-	SetErrorHandlers(...ErrorHandler)
-	SetWriteResponse(WriteResponse)
-	SetReadRequestContent(ReadRequest)
+	SuccessCode(int)
+	ErrorHandlers(...ErrorMatcher)
+	WriteResponse(WriteResponse)
 }
 
 // Shared Action and Task options.
 type options struct {
-	readRequestParam map[string]func(*http.Request, string) string
-	logError         func(context.Context, error, string)
-	writeResponse    func(
-		context.Context, http.ResponseWriter,
-		func(context.Context, error, string),
-		int, any,
-	)
-
-	errorHandlers      []ErrorHandler
-	successCode        int
-	readRequestContent ReadRequest
+	writeResponse func(context.Context, http.ResponseWriter, any, int)
+	errorHandlers []ErrorMatcher
+	successCode   int
 }
 
-func (o *options) SetSuccessCode(code int) {
+func (o *options) SuccessCode(code int) {
 	o.successCode = code
 }
 
-func (o *options) SetReadRequestParam(key string, fn func(*http.Request, string) string) {
-	o.readRequestParam[key] = fn
-}
-
-func (o *options) SetErrorLogger(log func(context.Context, error, string)) {
-	o.logError = log
-}
-
-func (o *options) SetErrorHandlers(handlers ...ErrorHandler) {
+func (o *options) ErrorHandlers(handlers ...ErrorMatcher) {
 	o.errorHandlers = append(o.errorHandlers, handlers...)
 }
 
-func (o *options) SetWriteResponse(w WriteResponse) {
+func (o *options) WriteResponse(w WriteResponse) {
 	o.writeResponse = w
 }
 
-func (o *options) SetReadRequestContent(r ReadRequest) {
-	o.readRequestContent = r
-}
-
 // Sets success response HTTP Status Code.
-func HTTPStatus(code int) func(Options) {
-	return func(o Options) { o.SetSuccessCode(code) }
+func SuccessCode(code int) func(Options) {
+	return func(o Options) { o.SuccessCode(code) }
 }
 
-// Sets URL parameters reader.
-func RequestParam(key string, fn func(*http.Request, string) string) func(Options) {
-	return func(o Options) { o.SetReadRequestParam(key, fn) }
-}
-
-// Sets logger to log error results.
-func ErrorLogger(log func(context.Context, error, string)) func(Options) {
-	return func(o Options) { o.SetErrorLogger(log) }
-}
-
-// Sets error handlers to return specific to each error HTTP Status Codes.
-func ErrorHandlers(handlers ...ErrorHandler) func(Options) {
+// HandleErrorWithCode checks if error is of E type
+// and returns designated HTTP Status Code with E instance as a response if true.
+func HandleErrorWithCode[E any](httpCode int) func(Options) {
 	return func(o Options) {
-		o.SetErrorHandlers(handlers...)
+		o.ErrorHandlers(
+			MatchError(func(err error) (any, int) {
+				var target E
+				if errors.As(err, &target) {
+					return target, httpCode
+				}
+
+				return nil, 0
+			}),
+		)
+	}
+}
+
+// HandleError checks if error is of E type
+// and returns designated HTTP Status Code with transformed response using as callback if true.
+func HandleError(matcher ErrorMatcher) func(Options) {
+	return func(o Options) {
+		o.ErrorHandlers(
+			MatchErrorRequest(func(r *http.Request, err error) (any, int) {
+				response, code := matcher.Match(r, err)
+				if code != 0 {
+					return response, code
+				}
+
+				return nil, 0
+			}),
+		)
 	}
 }
 
 // Sets response writer.
 func ResponseWriter(w WriteResponse) func(Options) {
-	return func(o Options) { o.SetWriteResponse(w) }
-}
-
-// Sets requests content reader.
-func RequestContentReader(r ReadRequest) func(Options) {
-	return func(o Options) { o.SetReadRequestContent(r) }
+	return func(o Options) { o.WriteResponse(w) }
 }

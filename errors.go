@@ -1,39 +1,27 @@
 package controller
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 )
 
-// ErrorHandler transforms error to HTTP status code and response body.
-type ErrorHandler func(context.Context, error) (int, any)
-
-// IfError checks if error is of E type
-// and returns designated HTTP Status Code with E instance as a response if true.
-func IfError[E any](httpCode int) ErrorHandler {
-	return func(_ context.Context, err error) (int, any) {
-		var target E
-		if errors.As(err, &target) {
-			return httpCode, target
-		}
-
-		return 0, nil
-	}
+type ErrorMatcher interface {
+	Match(*http.Request, error) (any, int)
 }
 
-// IfErrorUse checks if error is of E type
-// and returns designated HTTP Status Code with transformed response using as callback if true.
-func IfErrorUse[E any](as func(context.Context, E) any, httpCode int) ErrorHandler {
-	return func(ctx context.Context, err error) (int, any) {
-		var target E
-		if errors.As(err, &target) {
-			return httpCode, as(ctx, target)
-		}
+// MatchErrorRequest transforms error to HTTP status code and response body.
+type MatchErrorRequest func(*http.Request, error) (any, int)
 
-		return 0, nil
-	}
+func (match MatchErrorRequest) Match(r *http.Request, err error) (any, int) {
+	return match(r, err)
+}
+
+type MatchError func(error) (any, int)
+
+func (match MatchError) Match(_ *http.Request, err error) (any, int) {
+	return match(err)
 }
 
 // If request payload reading failed - ReadRequestError is returned.
@@ -49,13 +37,57 @@ func (err *ReadRequestError) Unwrap() error {
 	return err.err
 }
 
-func getErrorResponse(ctx context.Context, err error, handlers []ErrorHandler) (int, any) {
-	for _, handle := range handlers {
-		code, response := handle(ctx, err)
+func SetDefaultErrorHandlers(handlers ...ErrorMatcher) {
+	defaultErrorHandlers.Store(&handlers)
+}
+
+func init() {
+	defaultErrorHandlers.Store(&[]ErrorMatcher{
+		MatchError(func(err error) (any, int) {
+			var readErr *ReadRequestError
+			if errors.As(err, &readErr) {
+				return readErr.Error(), http.StatusBadRequest
+			}
+
+			return nil, 0
+		}),
+	})
+}
+
+var defaultErrorHandlers atomic.Pointer[[]ErrorMatcher]
+
+func getErrorResponse(r *http.Request, err error, handlers []ErrorMatcher) (any, int) {
+	for _, matcher := range append(handlers, *defaultErrorHandlers.Load()...) {
+		response, code := matcher.Match(r, err)
 		if code != 0 {
-			return code, response
+			return response, code
 		}
 	}
 
-	return http.StatusInternalServerError, err.Error()
+	return err.Error(), http.StatusInternalServerError
+}
+
+func newRecoveredError(p any, stack []byte) error {
+	return &RecoveredError{
+		Panic: p,
+		Stack: stack,
+	}
+}
+
+type RecoveredError struct {
+	Panic any
+	Stack []byte
+}
+
+func (err *RecoveredError) Unwrap() error {
+	rp, ok := err.Panic.(error)
+	if ok {
+		return rp
+	}
+
+	return nil
+}
+
+func (err *RecoveredError) Error() string {
+	return fmt.Sprintf("recovered from panic: %v", err.Panic)
 }
