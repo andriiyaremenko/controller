@@ -11,15 +11,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v5
       with:
-        go-version: 1.18
+        go-version: 1.23
 
     - name: Build
       run: go build -v ./...
 
     - name: Test
-      run: go test -race --cover
+      run: go run github.com/onsi/ginkgo/v2/ginkgo -r --race --trace --fail-on-pending --keep-going -vv
+
+    - name: Bench
+      run: go test -benchmem -bench=. ./... -benchtime=10s
+
