@@ -38,20 +38,23 @@ func (err *ReadRequestError) Unwrap() error {
 }
 
 func SetDefaultErrorHandlers(handlers ...ErrorMatcher) {
-	defaultErrorHandlers.Store(&handlers)
+	if len(handlers) > 0 {
+		handlers = append(handlers, readRequestErrorHandle)
+		defaultErrorHandlers.Store(&handlers)
+	}
 }
 
-func init() {
-	defaultErrorHandlers.Store(&[]ErrorMatcher{
-		MatchError(func(err error) (any, int) {
-			var readErr *ReadRequestError
-			if errors.As(err, &readErr) {
-				return readErr.Error(), http.StatusBadRequest
-			}
+var readRequestErrorHandle = MatchError(func(err error) (any, int) {
+	var readErr *ReadRequestError
+	if errors.As(err, &readErr) {
+		return readErr.Error(), http.StatusBadRequest
+	}
 
-			return nil, 0
-		}),
-	})
+	return nil, 0
+})
+
+func init() {
+	defaultErrorHandlers.Store(&[]ErrorMatcher{readRequestErrorHandle})
 }
 
 var defaultErrorHandlers atomic.Pointer[[]ErrorMatcher]

@@ -41,10 +41,10 @@ func BenchmarkControllerHandleSuccess(b *testing.B) {
 	}
 
 	action := controller.
-		Handle[*string](h).
+		Respond[*string](h).
 		With(
 			controller.SuccessCode(http.StatusCreated),
-			controller.HandleErrorWithCode[*testError](http.StatusBadRequest),
+			controller.ErrorWithCode[*testError](http.StatusBadRequest),
 		)
 
 	b.ResetTimer()
@@ -66,10 +66,10 @@ func BenchmarkControllerHandleError(b *testing.B) {
 	}
 
 	action := controller.
-		Handle[*string](h).
+		Respond[*string](h).
 		With(
 			controller.SuccessCode(http.StatusCreated),
-			controller.HandleErrorWithCode[*testError](http.StatusBadRequest),
+			controller.ErrorWithCode[*testError](http.StatusBadRequest),
 		)
 
 	b.ResetTimer()
@@ -91,10 +91,10 @@ func Benchmark_100_000_ParallelControllerHandleSuccess(b *testing.B) {
 	}
 
 	action := controller.
-		Handle[*string](h).
+		Respond[*string](h).
 		With(
 			controller.SuccessCode(http.StatusCreated),
-			controller.HandleErrorWithCode[*testError](http.StatusBadRequest),
+			controller.ErrorWithCode[*testError](http.StatusBadRequest),
 		)
 
 	b.ResetTimer()
@@ -119,10 +119,10 @@ func Benchmark_100_000_ParallelControllerHandleError(b *testing.B) {
 	}
 
 	action := controller.
-		Handle[*string](h).
+		Respond[*string](h).
 		With(
 			controller.SuccessCode(http.StatusCreated),
-			controller.HandleErrorWithCode[*testError](http.StatusBadRequest),
+			controller.ErrorWithCode[*testError](http.StatusBadRequest),
 		)
 
 	b.ResetTimer()

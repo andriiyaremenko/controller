@@ -12,7 +12,6 @@ type Options interface {
 	WriteResponse(WriteResponse)
 }
 
-// Shared Action and Task options.
 type options struct {
 	writeResponse func(context.Context, http.ResponseWriter, any, int)
 	errorHandlers []ErrorMatcher
@@ -36,9 +35,9 @@ func SuccessCode(code int) func(Options) {
 	return func(o Options) { o.SuccessCode(code) }
 }
 
-// HandleErrorWithCode checks if error is of E type
+// ErrorWithCode checks if error is of E type
 // and returns designated HTTP Status Code with E instance as a response if true.
-func HandleErrorWithCode[E any](httpCode int) func(Options) {
+func ErrorWithCode[E any](httpCode int) func(Options) {
 	return func(o Options) {
 		o.ErrorHandlers(
 			MatchError(func(err error) (any, int) {
@@ -53,9 +52,9 @@ func HandleErrorWithCode[E any](httpCode int) func(Options) {
 	}
 }
 
-// HandleError checks if error is of E type
+// ErrorHandle checks if error is of E type
 // and returns designated HTTP Status Code with transformed response using as callback if true.
-func HandleError(matcher ErrorMatcher) func(Options) {
+func ErrorHandle(matcher ErrorMatcher) func(Options) {
 	return func(o Options) {
 		o.ErrorHandlers(
 			MatchErrorRequest(func(r *http.Request, err error) (any, int) {

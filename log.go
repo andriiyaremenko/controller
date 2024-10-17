@@ -1,13 +1,12 @@
 package controller
 
 import (
-	"context"
 	"log/slog"
 	"sync/atomic"
 )
 
 type Logger interface {
-	ErrorContext(ctx context.Context, msg string, args ...any)
+	Error(msg string, args ...any)
 }
 
 func SetLogger(l Logger) {
