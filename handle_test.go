@@ -1,3 +1,4 @@
+// nolint: typecheck
 package controller_test
 
 import (
@@ -22,16 +23,18 @@ func (e *testError) Error() string {
 	return e.Detail
 }
 
-var _ = Describe("Action", func() {
+var _ = Describe("Handle", func() {
 	requestBody := `"Hello World"`
-	h := func(_ context.Context, greet string) (string, error) {
-		Expect(greet).To(Equal("Hello World"))
+	h := func(r *http.Request) (string, error) {
+		greet, err := controller.ReadJSON[string](r)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(*greet).To(Equal("Hello World"))
 
 		return "success", nil
 	}
 
 	It("should work with defaults", func() {
-		action := controller.Action[string, string](h)
+		action := controller.Handle[string](h)
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -57,10 +60,10 @@ var _ = Describe("Action", func() {
 		Expect(result).To(Equal("success"))
 	})
 
-	It("should use WithHTTPStatusCode option", func() {
+	It("should use SuccessCode option", func() {
 		action := controller.
-			Action[string, string](h).
-			With(controller.HTTPStatus(http.StatusCreated))
+			Handle[string](h).
+			With(controller.SuccessCode(http.StatusCreated))
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -86,99 +89,17 @@ var _ = Describe("Action", func() {
 		Expect(result).To(Equal("success"))
 	})
 
-	It("should use WithURLParamReader option", func() {
-		h := func(ctx context.Context, greet string) (string, error) {
-			Expect(greet).To(Equal("Hello World"))
-			Expect(controller.ContextParam(ctx, "test")).To(Equal("test"))
-
-			return "success", nil
-		}
-		action := controller.
-			Action[string, string](h).
-			With(
-				controller.RequestParam(
-					"test",
-					func(_ *http.Request, key string) string {
-						if key == "test" {
-							return "test"
-						}
-
-						return ""
-					},
-				),
-			)
-		ts := httptest.NewServer(action)
-
-		defer ts.Close()
-
-		resp, err := http.Post(
-			fmt.Sprintf("%s", ts.URL),
-			"application/json; charset=utf-8",
-			strings.NewReader(requestBody),
-		)
-
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-
-		defer resp.Body.Close()
-
-		b, err := io.ReadAll(resp.Body)
-
-		Expect(err).ShouldNot(HaveOccurred())
-
-		var result string
-
-		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
-		Expect(result).To(Equal("success"))
-	})
-
-	It("should be able to read from Headers", func() {
-		h := func(ctx context.Context, greet string) (string, error) {
-			Expect(greet).To(Equal("Hello World"))
-			Expect(controller.ContextParam(ctx, "Test")).To(Equal("test"))
-
-			return "success", nil
-		}
-		action := controller.
-			Action[string, string](h).
-			With(controller.RequestParam("Test", controller.FromHeaders))
-		ts := httptest.NewServer(action)
-
-		defer ts.Close()
-
-		req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s", ts.URL), strings.NewReader(requestBody))
-
-		req.Header.Add("Content-Type", "application/json; charset=utf-8")
-		req.Header.Add("Test", "test")
-
-		resp, err := http.DefaultClient.Do(req)
-
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-
-		defer resp.Body.Close()
-
-		b, err := io.ReadAll(resp.Body)
-
-		Expect(err).ShouldNot(HaveOccurred())
-
-		var result string
-
-		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
-		Expect(result).To(Equal("success"))
-	})
-
-	It("should use WithAppError option", func() {
-		h := func(_ context.Context, greet string) (string, error) {
-			Expect(greet).To(Equal("Hello World"))
+	It("should use HandleErrorWithCode option", func() {
+		h := func(r *http.Request) (string, error) {
+			greet, err := controller.ReadJSON[string](r)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*greet).To(Equal("Hello World"))
 
 			return "", &testError{Detail: "oops"}
 		}
 		action := controller.
-			Action[string, string](h).
-			With(
-				controller.ErrorHandlers(controller.IfError[*testError](http.StatusBadRequest)),
-			)
+			Handle[string](h).
+			With(controller.HandleErrorWithCode[*testError](http.StatusBadRequest))
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -204,23 +125,25 @@ var _ = Describe("Action", func() {
 		Expect(result.Detail).To(Equal("oops"))
 	})
 
-	It("should use WithAppError option with mapping", func() {
-		h := func(_ context.Context, greet string) (string, error) {
-			Expect(greet).To(Equal("Hello World"))
+	It("should use HandleError option", func() {
+		h := func(r *http.Request) (string, error) {
+			greet, err := controller.ReadJSON[string](r)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*greet).To(Equal("Hello World"))
 
 			return "", fmt.Errorf("oooh")
 		}
 		action := controller.
-			Action[string, string](h).
+			Handle[string](h).
 			With(
-				controller.ErrorHandlers(
-					controller.IfError[*testError](http.StatusBadRequest),
-					controller.IfErrorUse(
-						func(_ context.Context, err error) any {
-							return &testError{Detail: err.Error()}
-						},
-						http.StatusConflict,
-					),
+				controller.HandleError(
+					controller.MatchError(func(err error) (any, int) {
+						if err.Error() == "oooh" {
+							return &testError{Detail: err.Error()}, http.StatusConflict
+						}
+
+						return nil, 0
+					}),
 				),
 			)
 		ts := httptest.NewServer(action)
@@ -248,25 +171,107 @@ var _ = Describe("Action", func() {
 		Expect(result.Detail).To(Equal("oooh"))
 	})
 
-	It("should use WithErrorLogger option", func() {
-		h := func(_ context.Context, greet string) (string, error) {
-			Expect(greet).To(Equal("Hello World"))
+	It("should use custom ResponseWriter option", func() {
+		called := false
+		action := controller.
+			Handle[string](h).
+			With(
+				controller.ResponseWriter(func(ctx context.Context, w http.ResponseWriter, data any, status int) {
+					called = true
+					controller.WriteJSON(ctx, w, data, status)
+				}),
+			)
+		ts := httptest.NewServer(action)
 
-			return "", &testError{Detail: "oops"}
+		defer ts.Close()
+
+		resp, err := http.Post(
+			fmt.Sprintf("%s", ts.URL),
+			"application/json; charset=utf-8",
+			strings.NewReader(requestBody),
+		)
+
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+		defer resp.Body.Close()
+
+		b, err := io.ReadAll(resp.Body)
+
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(called).To(BeTrue())
+
+		var result string
+
+		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
+		Expect(result).To(Equal("success"))
+	})
+
+	It("should return status only if nothing was returned", func() {
+		h := func(r *http.Request) (any, error) {
+			return nil, nil
 		}
 		action := controller.
-			Action[string, string](h).
-			With(
-				controller.ErrorHandlers(
-					controller.IfError[*testError](http.StatusBadRequest),
-				),
-				controller.ErrorLogger(
-					func(_ context.Context, err error, message string) {
-						Expect(err).Should(BeAssignableToTypeOf(new(testError)))
-						Expect(err.(*testError).Detail).To(Equal("oops"))
-						Expect(message).To(Equal("request failed"))
-					}),
-			)
+			Handle[any](h).
+			With(controller.SuccessCode(http.StatusCreated))
+		ts := httptest.NewServer(action)
+
+		defer ts.Close()
+
+		resp, err := http.Post(
+			fmt.Sprintf("%s", ts.URL),
+			"application/json; charset=utf-8",
+			strings.NewReader(requestBody),
+		)
+
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+
+		defer resp.Body.Close()
+
+		b, err := io.ReadAll(resp.Body)
+
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(b).Should(BeEmpty())
+	})
+
+	It("should return InternalServerError if error was not handled", func() {
+		h := func(r *http.Request) (any, error) {
+			return nil, fmt.Errorf("oh no!")
+		}
+		action := controller.
+			Handle[any](h).
+			With(controller.SuccessCode(http.StatusCreated))
+		ts := httptest.NewServer(action)
+
+		defer ts.Close()
+
+		resp, err := http.Post(
+			fmt.Sprintf("%s", ts.URL),
+			"application/json; charset=utf-8",
+			strings.NewReader(requestBody),
+		)
+
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
+
+		defer resp.Body.Close()
+
+		b, err := io.ReadAll(resp.Body)
+
+		var result string
+
+		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
+		Expect(result).To(Equal("oh no!"))
+	})
+
+	It("should recover from panic", func() {
+		h := func(r *http.Request) (string, error) {
+			panic(&testError{Detail: "oops"})
+		}
+		action := controller.
+			Handle[string](h).
+			With(controller.HandleErrorWithCode[*testError](http.StatusBadRequest))
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -292,55 +297,58 @@ var _ = Describe("Action", func() {
 		Expect(result.Detail).To(Equal("oops"))
 	})
 
-	It("should use WithRequestContentReader option", func() {
-		called := false
-		action := controller.Action[string, string](h).
-			With(
-				controller.RequestContentReader(func(req *http.Request, model any) error {
-					called = true
-					return controller.JSONBodyReader(req, model)
-				}),
-			)
+	It("should return bad request error if got malformed request", func() {
+		requestBody := "field1=value1&field2=value2"
+		h := func(r *http.Request) (any, error) {
+			_, err := controller.ReadJSON[string](r)
+			return nil, err
+		}
+		action := controller.Handle[any](h)
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
 
 		resp, err := http.Post(
 			fmt.Sprintf("%s", ts.URL),
-			"application/json; charset=utf-8",
+			"application/x-www-form-urlencoded",
 			strings.NewReader(requestBody),
 		)
 
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 
 		defer resp.Body.Close()
 
 		b, err := io.ReadAll(resp.Body)
 
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(called).To(BeTrue())
 
 		var result string
 
 		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
-		Expect(result).To(Equal("success"))
+		Expect(result).To(Equal("failed to read request: invalid character 'i' in literal false (expecting 'a')"))
 	})
 
-	It("should use WithResponseWriter option", func() {
-		called := false
-		action := controller.
-			Action[string, string](h).
-			With(
-				controller.ResponseWriter(func(
-					ctx context.Context, w http.ResponseWriter,
-					logError func(context.Context, error, string),
-					status int, data any,
-				) {
-					called = true
-					controller.JSONWriter(ctx, w, logError, status, data)
-				}),
-			)
+	It("should use default error handlers option", func() {
+		h := func(r *http.Request) (string, error) {
+			greet, err := controller.ReadJSON[string](r)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*greet).To(Equal("Hello World"))
+
+			return "", fmt.Errorf("oooh")
+		}
+
+		controller.SetDefaultErrorHandlers(
+			controller.MatchError(func(err error) (any, int) {
+				if err.Error() == "oooh" {
+					return &testError{Detail: err.Error()}, http.StatusConflict
+				}
+
+				return nil, 0
+			}),
+		)
+
+		action := controller.Handle[string](h)
 		ts := httptest.NewServer(action)
 
 		defer ts.Close()
@@ -352,18 +360,17 @@ var _ = Describe("Action", func() {
 		)
 
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Expect(resp.StatusCode).To(Equal(http.StatusConflict))
 
 		defer resp.Body.Close()
 
 		b, err := io.ReadAll(resp.Body)
 
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(called).To(BeTrue())
 
-		var result string
+		var result testError
 
 		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
-		Expect(result).To(Equal("success"))
+		Expect(result.Detail).To(Equal("oooh"))
 	})
 })
