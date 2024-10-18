@@ -7,6 +7,37 @@ import (
 	"sync/atomic"
 )
 
+// If request payload reading failed - ReadRequestError is returned.
+type ReadRequestError struct {
+	err error
+}
+
+func (err *ReadRequestError) Error() string {
+	return fmt.Sprintf("failed to read request: %s", err.err)
+}
+
+func (err *ReadRequestError) Unwrap() error {
+	return err.err
+}
+
+type RecoveredError struct {
+	Panic any
+	Stack []byte
+}
+
+func (err *RecoveredError) Unwrap() error {
+	rp, ok := err.Panic.(error)
+	if ok {
+		return rp
+	}
+
+	return nil
+}
+
+func (err *RecoveredError) Error() string {
+	return fmt.Sprintf("recovered from panic: %v", err.Panic)
+}
+
 type ErrorMatcher interface {
 	Match(*http.Request, error) (any, int)
 }
@@ -22,19 +53,6 @@ type MatchError func(error) (any, int)
 
 func (match MatchError) Match(_ *http.Request, err error) (any, int) {
 	return match(err)
-}
-
-// If request payload reading failed - ReadRequestError is returned.
-type ReadRequestError struct {
-	err error
-}
-
-func (err *ReadRequestError) Error() string {
-	return fmt.Sprintf("failed to read request: %s", err.err)
-}
-
-func (err *ReadRequestError) Unwrap() error {
-	return err.err
 }
 
 func SetDefaultErrorHandlers(handlers ...ErrorMatcher) {
@@ -75,22 +93,4 @@ func newRecoveredError(p any, stack []byte) error {
 		Panic: p,
 		Stack: stack,
 	}
-}
-
-type RecoveredError struct {
-	Panic any
-	Stack []byte
-}
-
-func (err *RecoveredError) Unwrap() error {
-	rp, ok := err.Panic.(error)
-	if ok {
-		return rp
-	}
-
-	return nil
-}
-
-func (err *RecoveredError) Error() string {
-	return fmt.Sprintf("recovered from panic: %v", err.Panic)
 }

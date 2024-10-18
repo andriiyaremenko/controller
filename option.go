@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"errors"
 	"net/http"
 )
@@ -13,9 +12,9 @@ type Options interface {
 }
 
 type options struct {
-	writeResponse func(context.Context, http.ResponseWriter, any, int)
-	errorHandlers []ErrorMatcher
-	successCode   int
+	responseWriter WriteResponse
+	errorHandlers  []ErrorMatcher
+	successCode    int
 }
 
 func (o *options) SuccessCode(code int) {
@@ -27,7 +26,7 @@ func (o *options) ErrorHandlers(handlers ...ErrorMatcher) {
 }
 
 func (o *options) WriteResponse(w WriteResponse) {
-	o.writeResponse = w
+	o.responseWriter = w
 }
 
 // Sets success response HTTP Status Code.

@@ -6,8 +6,6 @@ import (
 	"net/http"
 )
 
-type RequestReaderFunc[T any] func(*http.Request) (*T, error)
-
 // Request reader to read JSON from Body.
 func ReadJSON[T any](req *http.Request) (*T, error) {
 	b, err := io.ReadAll(req.Body)

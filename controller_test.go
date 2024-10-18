@@ -179,10 +179,12 @@ var _ = Describe("Respond", func() {
 		action := controller.
 			Respond[string](h).
 			With(
-				controller.ResponseWriter(func(ctx context.Context, w http.ResponseWriter, data any, status int) {
-					called = true
-					controller.WriteJSON(ctx, w, data, status)
-				}),
+				controller.ResponseWriter(
+					controller.WriteResponseFn(func(ctx context.Context, w http.ResponseWriter, data any, status int) {
+						called = true
+						controller.WriteJSON(ctx, w, data, status)
+					}),
+				),
 			)
 		ts := httptest.NewServer(action)
 
@@ -375,5 +377,79 @@ var _ = Describe("Respond", func() {
 
 		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
 		Expect(result.Detail).To(Equal("oooh"))
+	})
+
+	It("decorated response", func() {
+		h := func(s int) controller.Respond[string] {
+			return func(r *http.Request) (string, error) {
+				greet, err := controller.ReadJSON[string](r)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(*greet).To(Equal("Hello World"))
+
+				return fmt.Sprintf("%d - %s", s, *greet), nil
+			}
+		}
+
+		action := controller.DecoratedResponse[string, int](h).With(controller.SuccessCode(http.StatusCreated))
+		ts := httptest.NewServer(action(15))
+
+		defer ts.Close()
+
+		resp, err := http.Post(
+			fmt.Sprintf("%s", ts.URL),
+			"application/json; charset=utf-8",
+			strings.NewReader(requestBody),
+		)
+
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+
+		defer resp.Body.Close()
+
+		b, err := io.ReadAll(resp.Body)
+
+		Expect(err).ShouldNot(HaveOccurred())
+
+		var result string
+
+		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
+		Expect(result).To(Equal("15 - Hello World"))
+	})
+
+	It("decorated response", func() {
+		var h controller.DecoratedResponse[string, int] = func(s int) controller.Respond[string] {
+			return func(r *http.Request) (string, error) {
+				greet, err := controller.ReadJSON[string](r)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(*greet).To(Equal("Hello World"))
+
+				return fmt.Sprintf("%d - %s", s, *greet), nil
+			}
+		}
+
+		action := h.With(controller.SuccessCode(http.StatusCreated))
+		ts := httptest.NewServer(action(15))
+
+		defer ts.Close()
+
+		resp, err := http.Post(
+			fmt.Sprintf("%s", ts.URL),
+			"application/json; charset=utf-8",
+			strings.NewReader(requestBody),
+		)
+
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+
+		defer resp.Body.Close()
+
+		b, err := io.ReadAll(resp.Body)
+
+		Expect(err).ShouldNot(HaveOccurred())
+
+		var result string
+
+		Expect(json.Unmarshal(b, &result)).ShouldNot(HaveOccurred())
+		Expect(result).To(Equal("15 - Hello World"))
 	})
 })
