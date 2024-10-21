@@ -2,7 +2,6 @@
 package controller_test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -180,9 +179,9 @@ var _ = Describe("Respond", func() {
 			Respond[string](h).
 			With(
 				controller.ResponseWriter(
-					controller.WriteResponseFn(func(ctx context.Context, w http.ResponseWriter, data any, status int) {
+					controller.WriteResponseFn(func(r *http.Request, w http.ResponseWriter, data any, status int) {
 						called = true
-						controller.WriteJSON(ctx, w, data, status)
+						controller.WriteJSON(r, w, data, status)
 					}),
 				),
 			)

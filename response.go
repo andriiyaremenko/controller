@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"runtime/debug"
@@ -37,7 +36,6 @@ func (handle Respond[T]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (handle Respond[T]) getHttpHandle(opts *options) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
 		defer func() {
 			if rp := recover(); rp != nil {
 				stack := debug.Stack()
@@ -46,7 +44,7 @@ func (handle Respond[T]) getHttpHandle(opts *options) http.HandlerFunc {
 				logger().Error("request failed: recovered from panic during request", "error", err, "stack", string(stack))
 
 				response, code := getErrorResponse(r, err, opts.errorHandlers)
-				opts.responseWriter.WriteError(ctx, w, response, code)
+				opts.responseWriter.WriteError(r, w, response, code)
 			}
 		}()
 
@@ -55,34 +53,34 @@ func (handle Respond[T]) getHttpHandle(opts *options) http.HandlerFunc {
 			logger().Error("request failed", "error", err)
 
 			response, code := getErrorResponse(r, err, opts.errorHandlers)
-			opts.responseWriter.WriteError(ctx, w, response, code)
+			opts.responseWriter.WriteError(r, w, response, code)
 
 			return
 		}
 
-		opts.responseWriter.Write(ctx, w, result, opts.successCode)
+		opts.responseWriter.Write(r, w, result, opts.successCode)
 	}
 }
 
 type WriteResponse interface {
-	Write(context.Context, http.ResponseWriter, any, int)
-	WriteError(context.Context, http.ResponseWriter, any, int)
+	Write(*http.Request, http.ResponseWriter, any, int)
+	WriteError(*http.Request, http.ResponseWriter, any, int)
 }
 
 // Response writer type.
-type WriteResponseFn func(context.Context, http.ResponseWriter, any, int)
+type WriteResponseFn func(*http.Request, http.ResponseWriter, any, int)
 
-func (fn WriteResponseFn) Write(ctx context.Context, w http.ResponseWriter, value any, code int) {
-	fn(ctx, w, value, code)
+func (fn WriteResponseFn) Write(r *http.Request, w http.ResponseWriter, value any, code int) {
+	fn(r, w, value, code)
 }
 
-func (fn WriteResponseFn) WriteError(ctx context.Context, w http.ResponseWriter, err any, code int) {
-	fn(ctx, w, err, code)
+func (fn WriteResponseFn) WriteError(r *http.Request, w http.ResponseWriter, err any, code int) {
+	fn(r, w, err, code)
 }
 
 // Response writer to write JSON response
 // in body with Content-Type "application/json; charset=utf-8" Header.
-var WriteJSON WriteResponseFn = func(ctx context.Context, w http.ResponseWriter, data any, status int) {
+var WriteJSON WriteResponseFn = func(_ *http.Request, w http.ResponseWriter, data any, status int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 
